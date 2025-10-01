@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/frantjc/daggerverse/go/internal/dagger"
 	"golang.org/x/mod/modfile"
@@ -45,10 +46,15 @@ func (m *Go) Build(ctx context.Context, pkg string) (*GoBuild, error) {
 
 	outputPath := "$GOPATH/bin/output"
 
+	dotPatchIndex := strings.LastIndex(gomod.Go.Version, ".")
+	if dotPatchIndex == -1 {
+		return nil, fmt.Errorf("invalid go version %s", gomod.Go.Version)
+	}
+
 	return &GoBuild{
 		Output: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
-				Packages: []string{fmt.Sprintf("go-%s", gomod.Go.Version)},
+				Packages: []string{fmt.Sprintf("go-%s", gomod.Go.Version[:dotPatchIndex])},
 			}).
 			WithEnvVariable("CGO_ENABLED", "0").
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).

@@ -45,17 +45,17 @@ func (m *Go) Build(ctx context.Context, pkg string) (*GoBuild, error) {
 
 	outputPath := "$GOPATH/bin/output"
 
-	output := dag.Container().
-		From(fmt.Sprintf("docker.io/library/golang:%s", gomod.Go.Version)).
-		WithEnvVariable("CGO_ENABLED", "0").
-		WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-		WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
-		WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-		WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
-		WithDirectory(workdir, m.Source, dagger.ContainerWithDirectoryOpts{Expand: true}).
-		WithWorkdir(workdir, dagger.ContainerWithWorkdirOpts{Expand: true}).
-		WithExec([]string{"go", "build", "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
-		File(outputPath)
-
-	return &GoBuild{Output: output}, nil
+	return &GoBuild{
+		Output: dag.Container().
+			From(fmt.Sprintf("docker.io/library/golang:%s", gomod.Go.Version)).
+			WithEnvVariable("CGO_ENABLED", "0").
+			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
+			WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
+			WithDirectory(workdir, m.Source, dagger.ContainerWithDirectoryOpts{Expand: true}).
+			WithWorkdir(workdir, dagger.ContainerWithWorkdirOpts{Expand: true}).
+			WithExec([]string{"go", "build", "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
+			File(outputPath, dagger.ContainerFileOpts{Expand: true}),
+	}, nil
 }

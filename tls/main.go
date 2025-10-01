@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/frantjc/daggerverse/tls/internal/dagger"
@@ -69,6 +70,7 @@ type TLSKeyPair struct {
 
 func (m *TLSCA) KeyPair(hostname string) *TLSKeyPair {
 	csrPath := fmt.Sprintf("%s/%s.csr", workDir, hostname)
+  extPath := fmt.Sprintf("%s/%s.ext", workDir, hostname)
 
 	return &TLSKeyPair{
 		Container: m.Container.
@@ -77,16 +79,21 @@ func (m *TLSCA) KeyPair(hostname string) *TLSKeyPair {
 				"-out", keyPath,
 				"4096",
 			}).
+			WithFile(
+				extPath,
+				dag.File(path.Base(extPath), fmt.Sprintf("subjectAltName=DNS:%s", hostname)),
+			).
 			WithExec([]string{
-				"openssl", "req", "-new",
-				"-key", keyPath,
-				"-out", csrPath,
-				"-subj", fmt.Sprintf(
-					"/C=US/ST=State/L=City/O=Dagger/OU=%s/CN=%s", hostname, hostname),
+					"openssl", "req", "-new",
+					"-key", keyPath,
+					"-out", csrPath,
+					"-subj", fmt.Sprintf(
+							"/C=US/ST=State/L=City/O=Dagger/OU=%s/CN=%s", hostname, hostname),
 			}).
 			WithExec([]string{
-				"openssl", "x509", "-req", "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath,
-				"-CAcreateserial", "-out", crtPath, "-days", days, "-sha256",
+					"openssl", "x509", "-req", "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath,
+					"-CAcreateserial", "-out", crtPath, "-days", days, "-sha256",
+					"-extensions", "v3_req", "-extfile", extPath,
 			}),
 	}
 }

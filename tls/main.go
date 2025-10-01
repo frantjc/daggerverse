@@ -11,7 +11,7 @@ import (
 )
 
 type TLS struct {
-	// + private
+	// +private
 	Container *dagger.Container
 }
 
@@ -41,13 +41,13 @@ func New() *TLS {
 	}
 }
 
-type TLSCA struct {
-	// + private
+type TlsCA struct {
+	// +private
 	Container *dagger.Container
 }
 
-func (m *TLS) CA() *TLSCA {
-	return &TLSCA{
+func (m *TLS) CA() *TlsCA {
+	return &TlsCA{
 		Container: m.Container.
 			WithExec([]string{
 				"openssl", "req", "-new", "-x509",
@@ -59,20 +59,20 @@ func (m *TLS) CA() *TLSCA {
 	}
 }
 
-func (m *TLSCA) Crt() *dagger.File {
+func (m *TlsCA) Crt() *dagger.File {
 	return m.Container.File(caCrtPath)
 }
 
-type TLSKeyPair struct {
-	// + private
+type TlsKeyPair struct {
+	// +private
 	Container *dagger.Container
 }
 
-func (m *TLSCA) KeyPair(hostname string) *TLSKeyPair {
+func (m *TlsCA) KeyPair(hostname string) *TlsKeyPair {
 	csrPath := fmt.Sprintf("%s/%s.csr", workDir, hostname)
-  extPath := fmt.Sprintf("%s/%s.ext", workDir, hostname)
+	extPath := fmt.Sprintf("%s/%s.ext", workDir, hostname)
 
-	return &TLSKeyPair{
+	return &TlsKeyPair{
 		Container: m.Container.
 			WithExec([]string{
 				"openssl", "genrsa",
@@ -84,24 +84,24 @@ func (m *TLSCA) KeyPair(hostname string) *TLSKeyPair {
 				dag.File(path.Base(extPath), fmt.Sprintf("[v3_req]\nsubjectAltName=DNS:%s", hostname)),
 			).
 			WithExec([]string{
-					"openssl", "req", "-new",
-					"-key", keyPath,
-					"-out", csrPath,
-					"-subj", fmt.Sprintf(
-							"/C=US/ST=State/L=City/O=Dagger/OU=%s/CN=%s", hostname, hostname),
+				"openssl", "req", "-new",
+				"-key", keyPath,
+				"-out", csrPath,
+				"-subj", fmt.Sprintf(
+					"/C=US/ST=State/L=City/O=Dagger/OU=%s/CN=%s", hostname, hostname),
 			}).
 			WithExec([]string{
-					"openssl", "x509", "-req", "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath,
-					"-CAcreateserial", "-out", crtPath, "-days", days, "-sha256",
-					"-extensions", "v3_req", "-extfile", extPath,
+				"openssl", "x509", "-req", "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath,
+				"-CAcreateserial", "-out", crtPath, "-days", days, "-sha256",
+				"-extensions", "v3_req", "-extfile", extPath,
 			}),
 	}
 }
 
-func (m *TLSKeyPair) Key() *dagger.File {
+func (m *TlsKeyPair) Key() *dagger.File {
 	return m.Container.File(keyPath)
 }
 
-func (m *TLSKeyPair) Crt() *dagger.File {
+func (m *TlsKeyPair) Crt() *dagger.File {
 	return m.Container.File(crtPath)
 }

@@ -4,60 +4,118 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"path"
+	"strings"
 
 	"github.com/frantjc/daggerverse/go/internal/dagger"
+	xstrings "github.com/frantjc/x/strings"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/semver"
 )
 
 type Go struct {
-	Source *dagger.Directory
+	Container *dagger.Container
 }
 
 func New(
+	ctx context.Context,
+	// +optional
+	module *dagger.Directory,
+	// +optional
+	goMod *dagger.File,
+	// +optional
+	version string,
+) (*Go, error) {
+	if module != nil {
+		goMod = module.File("go.mod")
+	}
+
+	if goMod != nil {
+		goModContents, err := goMod.Contents(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		version = parsedGoMod.Go.Version
+	}
+
+	if version == "" {
+		return nil, fmt.Errorf("one of module, go-mod, or version is required")
+	}
+
+	version = xstrings.EnsurePrefix(version, "v")
+	majorMinor := semver.MajorMinor(version)
+	if majorMinor == "" {
+		majorMinor = strings.TrimPrefix(version, "v")
+	} else {
+		majorMinor = strings.TrimPrefix(majorMinor, "v")
+	}
+
+	m := &Go{
+		Container: dag.Wolfi().
+			Container(dagger.WolfiContainerOpts{
+				Packages: []string{"go-" + majorMinor},
+			}).
+			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
+	}
+
+	if module == nil {
+		return m, nil
+	}
+
+	return m.WithSource(ctx, module)
+}
+
+func (m *Go) WithSource(
+	ctx context.Context,
 	// +optional
 	// +defaultPath="."
-	src *dagger.Directory,
-) *Go {
+	source *dagger.Directory,
+) (*Go, error) {
+	goModContents, err := source.File("go.mod").Contents(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Go{
-		Source: src,
-	}
+		Container: m.Container.
+			WithWorkdir(path.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
+			WithDirectory(".", source),
+	}, nil
 }
 
-type GoBuild struct {
-	Output *dagger.File
-}
-
-// Returns a container that echoes whatever string argument is provided
-func (m *Go) Build(ctx context.Context, pkg string) (*GoBuild, error) {
-	contents, err := m.Source.File("go.mod").Contents(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	gomod, err := modfile.Parse("go.mod", []byte(contents), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	workdir := path.Join("$GOPATH/src", gomod.Module.Mod.Path)
-
+func (m *Go) Build(
+	// +optional
+	// +default="./"
+	pkg string,
+) (*dagger.File, error) {
 	outputPath := "$GOPATH/bin/output"
 
-	return &GoBuild{
-		Output: dag.Wolfi().
-			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"go-"+semver.MajorMinor("v"+gomod.Go.Version)[1:]},
-			}).
-			WithEnvVariable("CGO_ENABLED", "0").
-			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
-			WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
-			WithDirectory(workdir, m.Source, dagger.ContainerWithDirectoryOpts{Expand: true}).
-			WithWorkdir(workdir, dagger.ContainerWithWorkdirOpts{Expand: true}).
-			WithExec([]string{"go", "build", "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
-			File(outputPath, dagger.ContainerFileOpts{Expand: true}),
-	}, nil
+	return m.Container.
+		WithEnvVariable("CGO_ENABLED", "0").
+		WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+		WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
+		WithExec([]string{"go", "build", "-trimpath", "-ldflags=-s -w", "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
+		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
+}
+
+func (m *Go) Test(
+	// +optional
+	// +default="./..."
+	pkg string,
+) (*dagger.Container, error) {
+	return m.Container.
+		WithExec([]string{"go", "test", "-race", "-cover", pkg}), nil
 }

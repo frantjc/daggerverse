@@ -28,13 +28,13 @@ type EnvVar struct {
 func New(
 	// +optional
 	// +defaultPath="."
-	src *dagger.Directory,
+	source *dagger.Directory,
 	// +optional
 	// +default=["docker-compose.yml"]
 	files []string,
 ) *Compose {
 	return &Compose{
-		Source: src,
+		Source: source,
 		Files:  files,
 	}
 }
@@ -49,7 +49,7 @@ func (m *Compose) WithEnv(name, val string) *Compose {
 
 func (m *Compose) Up(
 	ctx context.Context,
-	// + optional
+	// +optional
 	services ...string,
 ) (*dagger.Service, error) {
 	env := make(types.Mapping)
@@ -77,6 +77,7 @@ func (m *Compose) Up(
 		if err != nil {
 			return nil, err
 		}
+
 		loaderConfig.ConfigFiles = append(loaderConfig.ConfigFiles, types.ConfigFile{
 			Filename: filepath.Base(f),
 			Content:  []byte(content),
@@ -105,11 +106,13 @@ func (m *Compose) Up(
 		if err != nil {
 			return nil, err
 		}
+
 		for _, port := range composeSvc.Ports {
 			frontend, err := strconv.Atoi(port.Published)
 			if err != nil {
 				return nil, err
 			}
+
 			switch port.Mode {
 			case "ingress":
 				proxy = proxy.WithService(
@@ -128,10 +131,10 @@ func (m *Compose) Up(
 }
 
 func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dagger.Service, error) {
-	ctr := dag.Container()
+	container := dag.Container()
 
 	if svc.Image != "" {
-		ctr = ctr.From(svc.Image)
+		container = container.From(svc.Image)
 	} else if svc.Build != nil {
 		args := []dagger.BuildArg{}
 		for name, val := range svc.Build.Args {
@@ -143,7 +146,7 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 			}
 		}
 
-		ctr = m.Source.Directory(svc.Build.Context).DockerBuild(dagger.DirectoryDockerBuildOpts{
+		container = m.Source.Directory(svc.Build.Context).DockerBuild(dagger.DirectoryDockerBuildOpts{
 			Dockerfile: svc.Build.Dockerfile,
 			BuildArgs:  args,
 			Target:     svc.Build.Target,
@@ -161,7 +164,7 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 		return envs[i].Name < envs[j].Name
 	})
 	for _, env := range envs {
-		ctr = ctr.WithEnvVariable(env.Name, env.Value)
+		container = container.WithEnvVariable(env.Name, env.Value)
 	}
 
 	for _, port := range svc.Ports {
@@ -177,7 +180,7 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 				return nil, fmt.Errorf("protocol %s not supported", port.Protocol)
 			}
 
-			ctr = ctr.WithExposedPort(int(port.Target), dagger.ContainerWithExposedPortOpts{
+			container = container.WithExposedPort(int(port.Target), dagger.ContainerWithExposedPortOpts{
 				Protocol: protocol,
 			})
 		default:
@@ -191,7 +194,7 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 			return nil, err
 		}
 
-		ctr = ctr.WithExposedPort(port)
+		container = container.WithExposedPort(port)
 	}
 
 	wd, err := os.Getwd()
@@ -202,14 +205,14 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 	for _, vol := range svc.Volumes {
 		switch vol.Type {
 		case types.VolumeTypeBind:
-			src, err := filepath.Rel(wd, vol.Source)
+			source, err := filepath.Rel(wd, vol.Source)
 			if err != nil {
 				return nil, err
 			}
 
-			ctr = ctr.WithMountedDirectory(vol.Target, m.Source.Directory(src))
+			container = container.WithMountedDirectory(vol.Target, m.Source.Directory(source))
 		case types.VolumeTypeVolume:
-			ctr = ctr.WithMountedCache(vol.Target, dag.CacheVolume(vol.Source))
+			container = container.WithMountedCache(vol.Target, dag.CacheVolume(vol.Source))
 		default:
 			return nil, fmt.Errorf("volume type %s not supported", vol.Type)
 		}
@@ -226,14 +229,14 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 			return nil, err
 		}
 
-		ctr = ctr.WithServiceBinding(depName, svc)
+		container = container.WithServiceBinding(depName, svc)
 	}
 
 	if !svc.Entrypoint.IsZero() {
-		ctr = ctr.WithEntrypoint(svc.Entrypoint)
+		container = container.WithEntrypoint(svc.Entrypoint)
 	}
 
-	return ctr.AsService(dagger.ContainerAsServiceOpts{
+	return container.AsService(dagger.ContainerAsServiceOpts{
 		Args:                     svc.Command,
 		UseEntrypoint:            true,
 		InsecureRootCapabilities: svc.Privileged,

@@ -81,7 +81,7 @@ func (m *TLSCA) KeyPair(hostname string) *TLSKeyPair {
 			}).
 			WithFile(
 				extPath,
-				dag.File(path.Base(extPath), fmt.Sprintf("subjectAltName=DNS:%s", hostname)),
+				dag.File(path.Base(extPath), fmt.Sprintf("[v3_req]\nsubjectAltName=DNS:%s", hostname)),
 			).
 			WithExec([]string{
 					"openssl", "req", "-new",

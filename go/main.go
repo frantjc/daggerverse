@@ -46,8 +46,10 @@ func (m *Go) Build(ctx context.Context, pkg string) (*GoBuild, error) {
 	outputPath := "$GOPATH/bin/output"
 
 	return &GoBuild{
-		Output: dag.Container().
-			From(fmt.Sprintf("docker.io/library/golang:%s", gomod.Go.Version)).
+		Output: dag.Wolfi().
+			Container(dagger.WolfiContainerOpts{
+				Packages: []string{fmt.Sprintf("go-%s", gomod.Go.Version)},
+			}).
 			WithEnvVariable("CGO_ENABLED", "0").
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).

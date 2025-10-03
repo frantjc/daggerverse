@@ -102,7 +102,7 @@ func (m *Go) WithSource(
 	return &Go{
 		Container: m.Container.
 			WithWorkdir(path.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
-			WithDirectory(".", source),
+			WithMountedDirectory(".", source),
 	}, nil
 }
 

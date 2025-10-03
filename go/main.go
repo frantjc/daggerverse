@@ -18,6 +18,12 @@ type Go struct {
 	Container *dagger.Container
 }
 
+const (
+	group = "go"
+	user  = group
+	home  = "/home/" + user
+)
+
 func New(
 	ctx context.Context,
 	// +optional
@@ -62,6 +68,10 @@ func New(
 			Container(dagger.WolfiContainerOpts{
 				Packages: []string{"go-" + majorMinor},
 			}).
+			WithEnvVariable("HOME", home).
+			WithEnvVariable("GOPATH", "$HOME", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
 	}

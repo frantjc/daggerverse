@@ -100,6 +100,9 @@ func (m *Go) Build(
 	// +optional
 	// +default="./"
 	pkg string,
+	// +optional
+	// +default="-s -w"
+	ldflags string,
 ) (*dagger.File, error) {
 	outputPath := "$GOPATH/bin/output"
 
@@ -107,7 +110,7 @@ func (m *Go) Build(
 		WithEnvVariable("CGO_ENABLED", "0").
 		WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 		WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
-		WithExec([]string{"go", "build", "-trimpath", "-ldflags=-s -w", "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
+		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
 }
 

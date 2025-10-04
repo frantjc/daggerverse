@@ -66,7 +66,7 @@ func New(
 	m := &Go{
 		Container: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"git", "go-" + majorMinor},
+				Packages: []string{"go-" + majorMinor},
 			}).
 			WithEnvVariable("HOME", home).
 			WithEnvVariable("GOPATH", "$HOME", dagger.ContainerWithEnvVariableOpts{Expand: true}).

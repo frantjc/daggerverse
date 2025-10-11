@@ -1,4 +1,4 @@
-module github.com/frantjc/daggerverse/debian
+module github.com/frantjc/daggerverse/steamcmd
 
 go 1.25.1
 

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"dagger/modules/steamcmd/internal/dagger"
+	"github.com/frantjc/daggerverse/steamcmd/internal/dagger"
 
 	vdf "github.com/frantjc/go-encoding-vdf"
 	"github.com/frantjc/go-steamcmd"

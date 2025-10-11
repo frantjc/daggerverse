@@ -6,7 +6,7 @@ import (
 	"path"
 	"slices"
 
-	"dagger/modules/debian/internal/dagger"
+	"github.com/frantjc/daggerverse/debian/internal/dagger"
 	xslices "github.com/frantjc/x/slices"
 )
 

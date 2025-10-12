@@ -70,11 +70,12 @@ func (m *Steamcmd) AppUpdate(
 	ctx context.Context,
 	appID int,
 	// +optional
-	// +default="linux"
+	// +default="public"
 	branch string,
 	// +optional
 	betaPassword string,
 	// +optional
+	// +default="linux"
 	platformType PlatformType,
 ) (*dagger.Directory, error) {
 	rawAppInfo, err := m.AppInfoPrint(ctx, appID)

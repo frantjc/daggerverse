@@ -1,12 +1,11 @@
-module github.com/frantjc/daggerverse/steamcmd
+module github.com/frantjc/daggerverse/layer
 
 go 1.25.1
 
 require (
 	github.com/99designs/gqlgen v0.17.80
 	github.com/Khan/genqlient v0.8.1
-	github.com/frantjc/go-encoding-vdf v0.0.0-20240928221613-2ef12628042f
-	github.com/frantjc/go-steamcmd v0.0.0-20250908220709-0f4416580612
+	github.com/frantjc/x v0.0.0-20251012193508-c85ac79c497c
 	github.com/vektah/gqlparser/v2 v2.5.30
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.0
@@ -26,10 +25,7 @@ require (
 	google.golang.org/grpc v1.75.1
 )
 
-require github.com/frantjc/x v0.0.0-20251012193508-c85ac79c497c // indirect
-
 require (
-	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -46,9 +42,10 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 )
 
-replace (
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.0
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0
-	go.opentelemetry.io/otel/log => go.opentelemetry.io/otel/log v0.14.0
-	go.opentelemetry.io/otel/sdk/log => go.opentelemetry.io/otel/sdk/log v0.14.0
-)
+replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.0
+
+replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0
+
+replace go.opentelemetry.io/otel/log => go.opentelemetry.io/otel/log v0.14.0
+
+replace go.opentelemetry.io/otel/sdk/log => go.opentelemetry.io/otel/sdk/log v0.14.0

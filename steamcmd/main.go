@@ -13,7 +13,6 @@ import (
 	"github.com/frantjc/daggerverse/steamcmd/internal/dagger"
 	vdf "github.com/frantjc/go-encoding-vdf"
 	"github.com/frantjc/go-steamcmd"
-	xslices "github.com/frantjc/x/slices"
 )
 
 type Steamcmd struct{}
@@ -117,46 +116,4 @@ func (m *Steamcmd) AppUpdate(
 		WithEnvVariable("_SINDRI_CACHE", cache).
 		WithExec(steamcmdAppUpdateExec).
 		Directory(steamappDirectoryPath), nil
-}
-
-func (m *Steamcmd) AppUpdateOntoContainer(
-	ctx context.Context,
-	container *dagger.Container,
-	path string,
-	appID int,
-	// +optional
-	// +default="linux"
-	branch string,
-	// +optional
-	betaPassword string,
-	// +optional
-	platformType PlatformType,
-	// +optional
-	includes [][]string,
-	// +optional
-	exclude []string,
-	// +optional
-	owner string,
-	// +optional
-	expand bool,
-) (*dagger.Container, error) {
-	steamappDirectory, err := m.AppUpdate(ctx, appID, branch, betaPassword, platformType)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, include := range includes {
-		container = container.WithDirectory(path, steamappDirectory, dagger.ContainerWithDirectoryOpts{
-			Include: include,
-			Owner: owner,
-			Expand: expand,
-			Exclude: exclude,
-		})
-	}
-	
-	return container.WithDirectory(path, steamappDirectory, dagger.ContainerWithDirectoryOpts{
-		Owner: owner,
-		Expand: expand,
-		Exclude: append(exclude, xslices.Flatten(includes...)...),
-	}), nil
 }

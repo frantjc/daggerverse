@@ -66,19 +66,17 @@ func (m *Steamcmd) AppInfoPrint(
 
 type PlatformType = steamcmd.PlatformType
 
-type AppUpdateOpts struct {
-	// +default="linux"
-	Branch string
-	BetaPassword string
-	PlatformType PlatformType
-}
-
 // TODO(frantjc): Split this up into multiple layers using depots (only when auth is passed: depots required auth).
 func (m *Steamcmd) AppUpdate(
 	ctx context.Context,
 	appID int,
 	// +optional
-	opts AppUpdateOpts,
+	// +default="linux"
+	branch string,
+	// +optional
+	betaPassword string,
+	// +optional
+	platformType PlatformType,
 ) (*dagger.Directory, error) {
 	rawAppInfo, err := m.AppInfoPrint(ctx, appID)
 	if err != nil {
@@ -91,16 +89,16 @@ func (m *Steamcmd) AppUpdate(
 		return nil, err
 	}
 
-	steamappDirectoryPath := path.Join("/opt/sindri/steamapps", fmt.Sprint(appID))
+	steamappDirectoryPath := path.Join("/tmp", fmt.Sprint(appID))
 
 	appUpdateArgs, err := steamcmd.Args(nil,
 		steamcmd.ForceInstallDir(steamappDirectoryPath),
 		steamcmd.Login{},
-		steamcmd.ForcePlatformType(opts.PlatformType),
+		steamcmd.ForcePlatformType(platformType),
 		steamcmd.AppUpdate{
 			AppID:        appID,
-			Beta:         opts.Branch,
-			BetaPassword: opts.BetaPassword,
+			Beta:         branch,
+			BetaPassword: betaPassword,
 		},
 		steamcmd.Quit,
 	)
@@ -108,8 +106,8 @@ func (m *Steamcmd) AppUpdate(
 		return nil, err
 	}
 
-	cache := opts.Branch
-	if depot, ok := appInfo.Depots.Branches[cache]; ok {
+	cache := branch
+	if depot, ok := appInfo.Depots.Branches[branch]; ok {
 		cache = fmt.Sprint(depot.TimeUpdated)
 	}
 
@@ -121,39 +119,44 @@ func (m *Steamcmd) AppUpdate(
 		Directory(steamappDirectoryPath), nil
 }
 
-type AppUpdateOntoContainerOpts struct {
-	AppUpdateOpts
-	Includes [][]string
-	Exclude []string
-	Owner string
-	Expand bool
-}
-
 func (m *Steamcmd) AppUpdateOntoContainer(
 	ctx context.Context,
 	container *dagger.Container,
 	path string,
 	appID int,
 	// +optional
-	opts AppUpdateOntoContainerOpts,
+	// +default="linux"
+	branch string,
+	// +optional
+	betaPassword string,
+	// +optional
+	platformType PlatformType,
+	// +optional
+	includes [][]string,
+	// +optional
+	exclude []string,
+	// +optional
+	owner string,
+	// +optional
+	expand bool,
 ) (*dagger.Container, error) {
-	steamappDirectory, err := m.AppUpdate(ctx, appID, opts.AppUpdateOpts)
+	steamappDirectory, err := m.AppUpdate(ctx, appID, branch, betaPassword, platformType)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, include := range opts.Includes {
+	for _, include := range includes {
 		container = container.WithDirectory(path, steamappDirectory, dagger.ContainerWithDirectoryOpts{
 			Include: include,
-			Owner: opts.Owner,
-			Expand: opts.Expand,
-			Exclude: opts.Exclude,
+			Owner: owner,
+			Expand: expand,
+			Exclude: exclude,
 		})
 	}
 	
 	return container.WithDirectory(path, steamappDirectory, dagger.ContainerWithDirectoryOpts{
-		Owner: opts.Owner,
-		Expand: opts.Expand,
-		Exclude: append(opts.Exclude, xslices.Flatten(opts.Includes...)...),
+		Owner: owner,
+		Expand: expand,
+		Exclude: append(exclude, xslices.Flatten(includes...)...),
 	}), nil
 }

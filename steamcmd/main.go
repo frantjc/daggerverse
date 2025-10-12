@@ -66,7 +66,7 @@ func (m *Steamcmd) AppInfoPrint(
 
 type PlatformType = steamcmd.PlatformType
 
-// TODO(frantjc): Split this up into multiple layers using depots.
+// TODO(frantjc): Split this up into multiple layers using depots (only when auth is passed: depots required auth).
 func (m *Steamcmd) AppUpdate(
 	ctx context.Context,
 	appID int,
@@ -118,4 +118,20 @@ func (m *Steamcmd) AppUpdate(
 		WithEnvVariable("_SINDRI_CACHE", cache).
 		WithExec(steamcmdAppUpdateExec).
 		Directory(steamappDirectoryPath), nil
+}
+
+// TODO(frantjc): Split this up into multiple layers using depots.
+func (m *Steamcmd) AppUpdateOntoContainer(
+	ctx context.Context,
+	appID int,
+	// +optional
+	// +default="public"
+	branch,
+	// +optional
+	betaPassword string,
+	// +optional
+	// +default="linux"
+	platformType PlatformType,
+) *dagger.Container {
+
 }

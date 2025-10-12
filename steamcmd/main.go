@@ -78,7 +78,7 @@ func (m *Steamcmd) AppUpdate(
 	ctx context.Context,
 	appID int,
 	// +optional
-	opts *AppUpdateOpts,
+	opts AppUpdateOpts,
 ) (*dagger.Directory, error) {
 	rawAppInfo, err := m.AppInfoPrint(ctx, appID)
 	if err != nil {
@@ -135,9 +135,9 @@ func (m *Steamcmd) AppUpdateOntoContainer(
 	path string,
 	appID int,
 	// +optional
-	opts *AppUpdateOntoContainerOpts,
+	opts AppUpdateOntoContainerOpts,
 ) (*dagger.Container, error) {
-	steamappDirectory, err := m.AppUpdate(ctx, appID, &opts.AppUpdateOpts)
+	steamappDirectory, err := m.AppUpdate(ctx, appID, opts.AppUpdateOpts)
 	if err != nil {
 		return nil, err
 	}

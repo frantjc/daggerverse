@@ -32,6 +32,8 @@ func New(
 	goMod *dagger.File,
 	// +optional
 	version string,
+	// +optionl
+	additionalWolfiPackages []string,
 ) (*Go, error) {
 	if module != nil {
 		goMod = module.File("go.mod")
@@ -66,15 +68,18 @@ func New(
 	m := &Go{
 		Container: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"go-" + majorMinor},
+				Packages: append([]string{"go-" + majorMinor}, additionalWolfiPackages...),
 			}).
 			WithEnvVariable("HOME", home).
 			WithEnvVariable("GOPATH", "$HOME", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
+			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
+			WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
 	}
+
 
 	if module == nil {
 		return m, nil
@@ -113,13 +118,18 @@ func (m *Go) Build(
 	// +optional
 	// +default="-s -w"
 	ldflags string,
+	// +optional
+	cgo bool,
 ) (*dagger.File, error) {
-	outputPath := "$GOPATH/bin/output"
+	outputPath := "$GOBIN/output"
+
+	cgoEnabled := "0"
+	if cgo {
+		cgoEnabled = "1"
+	}
 
 	return m.Container.
-		WithEnvVariable("CGO_ENABLED", "0").
-		WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-		WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
+		WithEnvVariable("CGO_ENABLED", cgoEnabled).
 		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
 }

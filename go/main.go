@@ -32,7 +32,7 @@ func New(
 	goMod *dagger.File,
 	// +optional
 	version string,
-	// +optionl
+	// +optional
 	additionalWolfiPackages []string,
 ) (*Go, error) {
 	if module != nil {

@@ -107,7 +107,8 @@ func (m *Go) WithSource(
 	return &Go{
 		Container: m.Container.
 			WithWorkdir(path.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
-			WithMountedDirectory(".", source),
+			WithMountedDirectory(".", source).
+			WithExec([]string{"go", "mod", "download"}),
 	}, nil
 }
 

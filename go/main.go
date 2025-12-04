@@ -134,12 +134,3 @@ func (m *Go) Build(
 		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
 }
-
-func (m *Go) Test(
-	// +optional
-	// +default="./..."
-	pkg string,
-) (*dagger.Container, error) {
-	return m.Container.
-		WithExec([]string{"go", "test", "-race", "-cover", pkg}), nil
-}

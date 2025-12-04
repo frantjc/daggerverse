@@ -40,7 +40,8 @@ type TlsCA struct {
 	Container *dagger.Container
 }
 
-// +cache="8760h"
+// NB: Should be 1y, but max is 168h.
+// +cache="168h"
 func (m *TLS) CA() *TlsCA {
 	return &TlsCA{
 		Container: m.Container.
@@ -63,7 +64,8 @@ type TlsKeyPair struct {
 	Container *dagger.Container
 }
 
-// +cache="8760h"
+// NB: Should be 1y, but max is 168h.
+// +cache="168h"
 func (m *TlsCA) KeyPair(hostname string) *TlsKeyPair {
 	csrPath := fmt.Sprintf("%s/%s.csr", workDir, hostname)
 	extPath := fmt.Sprintf("%s/%s.ext", workDir, hostname)

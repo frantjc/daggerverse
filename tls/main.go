@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"path"
-	"time"
 
 	"github.com/frantjc/daggerverse/tls/internal/dagger"
 )
@@ -24,10 +23,6 @@ const (
 	days      = "365"
 )
 
-var (
-	year = fmt.Sprint(time.Now().Year())
-)
-
 func New() *TLS {
 	return &TLS{
 		Container: dag.Wolfi().
@@ -36,8 +31,7 @@ func New() *TLS {
 				"openssl", "genrsa",
 				"-out", caKeyPath,
 				"4096",
-			}).
-			WithEnvVariable("_TLS_CACHE", year),
+			}),
 	}
 }
 
@@ -46,6 +40,7 @@ type TlsCA struct {
 	Container *dagger.Container
 }
 
+// +cache="1y"
 func (m *TLS) CA() *TlsCA {
 	return &TlsCA{
 		Container: m.Container.
@@ -68,6 +63,7 @@ type TlsKeyPair struct {
 	Container *dagger.Container
 }
 
+// +cache="1y"
 func (m *TlsCA) KeyPair(hostname string) *TlsKeyPair {
 	csrPath := fmt.Sprintf("%s/%s.csr", workDir, hostname)
 	extPath := fmt.Sprintf("%s/%s.ext", workDir, hostname)

@@ -121,6 +121,10 @@ func (m *Go) Build(
 	ldflags string,
 	// +optional
 	cgo bool,
+	// +optional
+	goarch string,
+	// +optional
+	goos string,
 ) (*dagger.File, error) {
 	outputPath := "$GOBIN/output"
 
@@ -131,6 +135,15 @@ func (m *Go) Build(
 
 	return m.Container.
 		WithEnvVariable("CGO_ENABLED", cgoEnabled).
+		With(func(c *dagger.Container) *dagger.Container {
+			if goos != "" {
+				c = c.WithEnvVariable("GOOS", goos)
+			}
+			if goarch != "" {
+				c = c.WithEnvVariable("GOARCH", goarch)
+			}
+			return c
+		}).
 		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
 }

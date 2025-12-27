@@ -27,7 +27,7 @@ func (m *Dogger) AsService() *dagger.Service {
 		WithFile(
 			"/usr/local/bin/dogger",
 			dag.Go(dagger.GoOpts{
-				Module: dag.CurrentModule().Source().Directory("internal/dogger"),
+				Module:                  dag.CurrentModule().Source().Directory("internal/dogger"),
 				AdditionalWolfiPackages: []string{"gcc"},
 			}).
 				Build(dagger.GoBuildOpts{
@@ -38,12 +38,12 @@ func (m *Dogger) AsService() *dagger.Service {
 		WithExposedPort(m.Port).
 		AsService(dagger.ContainerAsServiceOpts{
 			ExperimentalPrivilegedNesting: true,
-			Args: []string{"dogger", fmt.Sprintf("--addr=:%d", m.Port)},
+			Args:                          []string{"dogger", fmt.Sprintf("--addr=:%d", m.Port)},
 		})
 }
 
 func (m *Dogger) DockerHost(alias string) string {
-	return fmt.Sprintf("%s:%d", alias, m.Port)
+	return fmt.Sprintf("tcp://%s:%d", alias, m.Port)
 }
 
 func (m *Dogger) BoundTo(

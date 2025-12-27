@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/backends"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/handler"
+	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/logutil"
 	sqlstorage "github.com/frantjc/daggerverse/dogger/internal/dogger/internal/storage/sql"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -20,26 +22,31 @@ import (
 
 func NewDogger(version string) *cobra.Command {
 	var (
-		listener string
+		address string
+		slogCfg = new(logutil.SlogConfig)
 		cmd      = &cobra.Command{
 			Use:           "dogger",
 			SilenceErrors: true,
 			SilenceUsage:  true,
 			Version:       version,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				eg, ctx := errgroup.WithContext(cmd.Context())
+				eg, ctx := errgroup.WithContext(
+					logutil.SloggerInto(cmd.Context(), slog.New(slog.NewJSONHandler(cmd.OutOrStdout(), &slog.HandlerOptions{
+						Level: slogCfg,
+					}))),
+				)
 
-				if !strings.Contains(listener, "://") {
+				if !strings.Contains(address, "://") {
 					// Default to listening on ip:port.
-					listener = fmt.Sprintf("tcp://%s", listener)
+					address = fmt.Sprintf("tcp://%s", address)
 				}
 
-				l, err := url.Parse(listener)
+				a, err := url.Parse(address)
 				if err != nil {
 					return err
 				}
 
-				lis, err := net.Listen(l.Scheme, strings.TrimPrefix(l.String(), fmt.Sprintf("%s://", l.Scheme)))
+				lis, err := net.Listen(a.Scheme, strings.TrimPrefix(a.String(), fmt.Sprintf("%s://", a.Scheme)))
 				if err != nil {
 					return err
 				}
@@ -57,6 +64,9 @@ func NewDogger(version string) *cobra.Command {
 				if err := log.SetLevel(log.DebugLevel.String()); err != nil {
 					return err
 				}
+
+				level, _, _ := strings.Cut(strings.ToLower(slogCfg.Level().String()), "+")
+				log.SetLevel(level)
 
 				srv := &http.Server{
 					ReadHeaderTimeout: time.Second * 5,
@@ -90,9 +100,8 @@ func NewDogger(version string) *cobra.Command {
 
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
 	cmd.Flags().Bool("version", false, "Version for "+cmd.Name())
-	cmd.SetVersionTemplate("{{ .Name }}{{ .Version }}")
-
-	cmd.Flags().StringVarP(&listener, "addr", "a", ":1331", "Listen address")
+	slogCfg.AddFlags(cmd.Flags())
+	cmd.Flags().StringVarP(&address, "addr", "a", ":1331", "Listen address")
 
 	return cmd
 }

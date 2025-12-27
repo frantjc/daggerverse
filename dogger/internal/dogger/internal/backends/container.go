@@ -16,9 +16,12 @@ import (
 	containertypes "github.com/docker/docker/api/types/container"
 	filterstypes "github.com/docker/docker/api/types/filters"
 	networktypes "github.com/docker/docker/api/types/network"
+	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/dagutil"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/storage"
 	"github.com/google/uuid"
 	archive "github.com/moby/go-archive"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 )
 
 var (
@@ -26,84 +29,77 @@ var (
 )
 
 type ContainerBackend struct {
+	// Context is the fallback ctx for functions that do not accept a ctx argument.
 	Context context.Context
-	Client  *dagger.Client
+	// Storage is where data about the containers gets kept.
 	Storage storage.ContainerStore
 }
 
 var _ containerrouter.Backend = new(ContainerBackend)
 
-// ContainerArchivePath implements container.Backend.
+// ContainerArchivePath implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerArchivePath(name string, path string) (content io.ReadCloser, stat *containertypes.PathStat, err error) {
 	return nil, nil, ErrUnimplemented
 }
 
-// ContainerAttach implements container.Backend.
+// ContainerAttach implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerAttach(name string, cfg *backend.ContainerAttachConfig) error {
-	return ErrUnimplemented
+	ctx, cancel := context.WithCancel(c.Context)
+	defer cancel()
+
+	data, err := c.Storage.GetContainer(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	stdin, stdout, stderr, err := cfg.GetStreams(false, cancel)
+	if err != nil {
+		return err
+	}
+
+	var (
+		_ = data
+		_ = stdin
+		_ = stdout
+		_ = stderr
+	)
+
+	return nil
 }
 
-// ContainerChanges implements container.Backend.
+// ContainerChanges implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerChanges(ctx context.Context, name string) ([]archive.Change, error) {
 	return nil, ErrUnimplemented
 }
 
-// ContainerCreate implements container.Backend.
+// ContainerCreate implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerCreate(ctx context.Context, config backend.ContainerCreateConfig) (containertypes.CreateResponse, error) {
-	dag := c.Client
-
-	container := dag.Container(dagger.ContainerOpts{Platform: getDaggerPlatform(config.Platform)})
-
 	if config.Config == nil {
 		return containertypes.CreateResponse{}, fmt.Errorf("image is required")
 	}
 
-	container = container.From(config.Config.Image)
 	warnings := []string{}
-
-	for exposedPort := range config.Config.ExposedPorts {
-		container = container.WithExposedPort(exposedPort.Int(), dagger.ContainerWithExposedPortOpts{
-			Protocol: dagger.NetworkProtocol(exposedPort.Proto()),
-		})
-	}
-
-	for k, v := range config.Config.Labels {
-		container = container.WithLabel(k, v)
-	}
-
-	if config.Config.User != "" {
-		container = container.WithUser(config.Config.User)
-	}
-
-	if config.Config.WorkingDir != "" {
-		container = container.WithWorkdir(config.Config.WorkingDir)
-	}
 
 	hostConfig := containertypes.HostConfig{}
 	if config.HostConfig != nil {
 		hostConfig = *config.HostConfig
 	}
 
-	for k, v := range hostConfig.Annotations {
-		container = container.WithAnnotation(k, v)
-	}
-
 	id := newID()
 
-	container = container.
-		WithExec(append(config.Config.Entrypoint, config.Config.Cmd...), dagger.ContainerWithExecOpts{
-			UseEntrypoint:                 len(config.Config.Entrypoint) == 0,
-			ExperimentalPrivilegedNesting: true,
-			InsecureRootCapabilities:      config.HostConfig.Privileged,
-		})
+	platform := ocispec.Platform{}
+	if config.Platform != nil {
+		platform = *config.Platform
+	}
 
 	if err := c.Storage.CreateContainer(ctx, id, &storage.Container{
 		ID:         id,
 		Created:    time.Now(),
 		Config:     *config.Config,
 		HostConfig: hostConfig,
+		Platform: platform,
 	}); err != nil {
-		return containertypes.CreateResponse{ID: id, Warnings: warnings}, err
+		return containertypes.CreateResponse{}, err
 	}
 
 	if config.Name == "" {
@@ -111,47 +107,47 @@ func (c *ContainerBackend) ContainerCreate(ctx context.Context, config backend.C
 	}
 
 	if err := c.Storage.NameContainer(ctx, id, id[:12]); err != nil {
-		return containertypes.CreateResponse{ID: id, Warnings: warnings}, err
+		return containertypes.CreateResponse{}, err
 	}
 
 	if err := c.Storage.NameContainer(ctx, id, config.Name); err != nil {
-		return containertypes.CreateResponse{ID: id, Warnings: warnings}, err
+		return containertypes.CreateResponse{}, err
 	}
 
 	return containertypes.CreateResponse{ID: id, Warnings: warnings}, nil
 }
 
-// ContainerExecCreate implements container.Backend.
+// ContainerExecCreate implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExecCreate(name string, options *containertypes.ExecOptions) (string, error) {
 	return "", ErrUnimplemented
 }
 
-// ContainerExecInspect implements container.Backend.
+// ContainerExecInspect implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExecInspect(id string) (*backend.ExecInspect, error) {
 	return nil, ErrUnimplemented
 }
 
-// ContainerExecResize implements container.Backend.
+// ContainerExecResize implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExecResize(ctx context.Context, name string, height uint32, width uint32) error {
 	return ErrUnimplemented
 }
 
-// ContainerExecStart implements container.Backend.
+// ContainerExecStart implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExecStart(ctx context.Context, name string, options backend.ExecStartConfig) error {
 	return ErrUnimplemented
 }
 
-// ContainerExport implements container.Backend.
+// ContainerExport implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExport(ctx context.Context, name string, out io.Writer) error {
 	return ErrUnimplemented
 }
 
-// ContainerExtractToDir implements container.Backend.
+// ContainerExtractToDir implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerExtractToDir(name string, path string, copyUIDGID bool, noOverwriteDirNonDir bool, content io.Reader) error {
 	return ErrUnimplemented
 }
 
-// ContainerInspect implements container.Backend.
+// ContainerInspect implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerInspect(ctx context.Context, name string, options backend.ContainerInspectOptions) (*containertypes.InspectResponse, error) {
 	data, err := c.Storage.GetContainer(ctx, name)
 	if err != nil {
@@ -176,120 +172,152 @@ func (c *ContainerBackend) ContainerInspect(ctx context.Context, name string, op
 	}, nil
 }
 
-// ContainerKill implements container.Backend.
+// ContainerKill implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerKill(name string, signal string) error {
-	return c.serviceStop(c.Context, name, true)
+	return ErrUnimplemented
 }
 
-func (c *ContainerBackend) serviceStop(ctx context.Context, name string, kill bool) error {
-	data, err := c.Storage.GetContainer(ctx, name)
-	if err != nil {
-		return nil
-	} // else if data.ServiceID == "" {
-	// 	return nil
-	// }
-
-	// service := c.Client.LoadServiceFromID(dagger.ServiceID(data.ServiceID))
-
-	// service, err = service.Stop(ctx, dagger.ServiceStopOpts{Kill: kill})
-	// if err != nil {
-	// 	return nil
-	// }
-
-	var _ = data
-
-	return nil
-}
-
-// ContainerLogs implements container.Backend.
+// ContainerLogs implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerLogs(ctx context.Context, name string, config *containertypes.LogsOptions) (<-chan *backend.LogMessage, bool, error) {
 	return nil, false, ErrUnimplemented
 }
 
-// ContainerPause implements container.Backend.
+// ContainerPause implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerPause(name string) error {
 	return ErrUnimplemented
 }
 
-// ContainerRename implements container.Backend.
+// ContainerRename implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerRename(oldName string, newName string) error {
 	return c.Storage.NameContainer(c.Context, oldName, newName)
 }
 
-// ContainerResize implements container.Backend.
+// ContainerResize implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerResize(ctx context.Context, name string, height uint32, width uint32) error {
 	return ErrUnimplemented
 }
 
-// ContainerRestart implements container.Backend.
+// ContainerRestart implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerRestart(ctx context.Context, name string, options containertypes.StopOptions) error {
 	return ErrUnimplemented
 }
 
-// ContainerRm implements container.Backend.
+// ContainerRm implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerRm(name string, config *backend.ContainerRmConfig) error {
 	return c.Storage.DeleteContainer(c.Context, name)
 }
 
-// ContainerStart implements container.Backend.
+// ContainerStart implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, checkpoint string, checkpointDir string) error {
-	if _, err := c.Storage.GetContainer(ctx, name); err != nil {
+	data, err := c.Storage.GetContainer(ctx, name)
+	if err != nil {
 		return err
+	}
+
+	dag, err := dagutil.Connect(ctx, func(req *collogspb.ExportLogsServiceRequest) {
+		fmt.Println(req.String())
+	})
+	if err != nil {
+		return err
+	}
+
+	config := data.Config
+	hostConfig := data.HostConfig
+	platform := &data.Platform
+
+	container := dag.
+		Container(dagger.ContainerOpts{
+			Platform: getDaggerPlatform(platform),
+		}).
+		From(config.Image)
+
+	for exposedPort := range config.ExposedPorts {
+		container = container.WithExposedPort(exposedPort.Int(), dagger.ContainerWithExposedPortOpts{
+			Protocol: dagger.NetworkProtocol(exposedPort.Proto()),
+		})
+	}
+
+	for k, v := range config.Labels {
+		container = container.WithLabel(k, v)
+	}
+
+	if config.User != "" {
+		container = container.WithUser(config.User)
+	}
+
+	if config.WorkingDir != "" {
+		container = container.WithWorkdir(config.WorkingDir)
+	}
+
+	for k, v := range hostConfig.Annotations {
+		container = container.WithAnnotation(k, v)
+	}
+
+	svc := container.
+		AsService(dagger.ContainerAsServiceOpts{
+			UseEntrypoint:                 len(config.Entrypoint) == 0,
+			Args: append(config.Entrypoint, config.Cmd...),
+			ExperimentalPrivilegedNesting: true,
+			InsecureRootCapabilities:      hostConfig.Privileged,
+		})
+		
+	if config.Hostname != "" {
+		svc, err = svc.
+			WithHostname(config.Hostname).
+			Start(ctx)
+		if err != nil {
+			return err
+		}
+	} else {
+		svc, err = svc.Start(ctx)
+		if err != nil {
+			return err
+		}
+
+		config.Hostname, err = svc.Endpoint(ctx)
+		if err != nil {
+			return err
+		}
+
+		if err = c.Storage.UpdateContainer(ctx, name, data); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// ContainerStatPath implements container.Backend.
+// ContainerStatPath implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerStatPath(name string, path string) (stat *containertypes.PathStat, err error) {
 	return nil, ErrUnimplemented
 }
 
-// ContainerStats implements container.Backend.
+// ContainerStats implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerStats(ctx context.Context, name string, config *backend.ContainerStatsConfig) error {
 	return ErrUnimplemented
 }
 
-// ContainerStop implements container.Backend.
+// ContainerStop implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerStop(ctx context.Context, name string, options containertypes.StopOptions) error {
-	cCtx := ctx
-	cancel := func() {}
-
-	switch {
-	case options.Timeout == nil:
-		cCtx, cancel = context.WithTimeout(cCtx, time.Second*10)
-	case *options.Timeout == 0:
-		return c.serviceStop(ctx, name, true)
-	case *options.Timeout > 0:
-		cCtx, cancel = context.WithTimeout(cCtx, time.Second*time.Duration(*options.Timeout))
-	}
-	defer cancel()
-
-	if err := c.serviceStop(cCtx, name, false); errors.Is(err, context.Canceled) {
-		return c.serviceStop(ctx, name, true)
-	} else if err != nil {
-		return err
-	}
-
-	return nil
+	return ErrUnimplemented
 }
 
-// ContainerTop implements container.Backend.
+// ContainerTop implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerTop(name string, psArgs string) (*containertypes.TopResponse, error) {
 	return nil, ErrUnimplemented
 }
 
-// ContainerUnpause implements container.Backend.
+// ContainerUnpause implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerUnpause(name string) error {
 	return ErrUnimplemented
 }
 
-// ContainerUpdate implements container.Backend.
+// ContainerUpdate implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerUpdate(name string, hostConfig *containertypes.HostConfig) (containertypes.UpdateResponse, error) {
 	return containertypes.UpdateResponse{}, ErrUnimplemented
 }
 
-// ContainerWait implements container.Backend.
+// ContainerWait implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerWait(ctx context.Context, name string, condition containertypes.WaitCondition) (<-chan containertypes.StateStatus, error) {
 	// TODO(frantjc)
 	exitCode := 0
@@ -300,18 +328,16 @@ func (c *ContainerBackend) ContainerWait(ctx context.Context, name string, condi
 	return statuses, nil
 }
 
-// Containers implements container.Backend.
+// Containers implements containerrouter.Backend.
 func (c *ContainerBackend) Containers(ctx context.Context, config *containertypes.ListOptions) ([]*containertypes.Summary, error) {
-	containers, err := c.Storage.ListContainers(ctx)
+	data, err := c.Storage.ListContainers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	summaries := make([]*containertypes.Summary, len(containers))
+	summaries := make([]*containertypes.Summary, len(data))
 
-	for i, container := range containers {
-		fmt.Println(container)
-
+	for i, container := range data {
 		ports := []containertypes.Port{}
 
 		for port, portBindings := range container.HostConfig.PortBindings {
@@ -351,17 +377,17 @@ func (c *ContainerBackend) Containers(ctx context.Context, config *containertype
 	return summaries, nil
 }
 
-// ContainersPrune implements container.Backend.
+// ContainersPrune implements containerrouter.Backend.
 func (c *ContainerBackend) ContainersPrune(ctx context.Context, pruneFilters filterstypes.Args) (*containertypes.PruneReport, error) {
 	return nil, ErrUnimplemented
 }
 
-// CreateImageFromContainer implements container.Backend.
+// CreateImageFromContainer implements containerrouter.Backend.
 func (c *ContainerBackend) CreateImageFromContainer(ctx context.Context, name string, config *backend.CreateImageConfig) (imageID string, err error) {
 	return "", ErrUnimplemented
 }
 
-// ExecExists implements container.Backend.
+// ExecExists implements containerrouter.Backend.
 func (c *ContainerBackend) ExecExists(name string) (bool, error) {
 	return false, ErrUnimplemented
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	containertypes "github.com/docker/docker/api/types/container"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ContainerStatus int
@@ -19,6 +20,7 @@ type Container struct {
 	Created     time.Time
 	Config      containertypes.Config
 	HostConfig  containertypes.HostConfig
+	Platform                    ocispec.Platform
 }
 
 type Image struct {

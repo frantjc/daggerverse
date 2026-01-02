@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"dagger.io/dagger/telemetry"
 	"github.com/containerd/log"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/backends"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/handler"
@@ -24,16 +25,19 @@ func NewDogger(version string) *cobra.Command {
 	var (
 		address string
 		slogCfg = new(logutil.SlogConfig)
-		cmd      = &cobra.Command{
+		cmd     = &cobra.Command{
 			Use:           "dogger",
 			SilenceErrors: true,
 			SilenceUsage:  true,
 			Version:       version,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				eg, ctx := errgroup.WithContext(
-					logutil.SloggerInto(cmd.Context(), slog.New(slog.NewJSONHandler(cmd.OutOrStdout(), &slog.HandlerOptions{
-						Level: slogCfg,
-					}))),
+					logutil.SloggerInto(
+						telemetry.InitEmbedded(cmd.Context(), nil),
+						slog.New(slog.NewJSONHandler(cmd.OutOrStdout(), &slog.HandlerOptions{
+							Level: slogCfg,
+						})), 
+					),
 				)
 
 				if !strings.Contains(address, "://") {
@@ -61,12 +65,11 @@ func NewDogger(version string) *cobra.Command {
 					return err
 				}
 
-				if err := log.SetLevel(log.DebugLevel.String()); err != nil {
+				level, _, _ := strings.Cut(strings.ToLower(slogCfg.Level().String()), "+")
+				if err := log.SetLevel(level); err != nil {
 					return err
 				}
-
-				level, _, _ := strings.Cut(strings.ToLower(slogCfg.Level().String()), "+")
-				log.SetLevel(level)
+				log.SetFormat(log.JSONFormat)
 
 				srv := &http.Server{
 					ReadHeaderTimeout: time.Second * 5,
@@ -77,16 +80,19 @@ func NewDogger(version string) *cobra.Command {
 						WithContainerBackend(&backends.ContainerBackend{Context: ctx, Storage: store}).
 						Handler(ctx, false),
 					BaseContext: func(_ net.Listener) context.Context {
-						return log.WithLogger(ctx, log.L)
+						return ctx // log.WithLogger(ctx, log.L)
 					},
 				}
+				log := logutil.SloggerFrom(ctx)
 
 				eg.Go(func() error {
+					log.Info("listening...", "addr", lis.Addr().String())
 					return srv.Serve(lis)
 				})
 
 				eg.Go(func() error {
 					<-ctx.Done()
+					log.Info("shutting down")
 					if err = srv.Shutdown(context.WithoutCancel(ctx)); err != nil {
 						return err
 					}

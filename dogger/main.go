@@ -21,19 +21,16 @@ func New(
 	}
 }
 
-func (m *Dogger) AsService() *dagger.Service {
+func (m *Dogger) Service() *dagger.Service {
 	return dag.Wolfi().
 		Container().
 		WithFile(
 			"/usr/local/bin/dogger",
-			dag.Go(dagger.GoOpts{
-				Module:                  dag.CurrentModule().Source().Directory("internal/dogger"),
-				AdditionalWolfiPackages: []string{"gcc"},
-			}).
-				Build(dagger.GoBuildOpts{
-					Pkg: "./cmd/dogger",
-					Cgo: true,
-				}),
+			dag.
+				DoggerDev(dagger.DoggerDevOpts{
+					Src: dag.CurrentModule().Source().Directory("internal/dogger"),
+				}).
+				Binary(),
 		).
 		WithExposedPort(m.Port).
 		AsService(dagger.ContainerAsServiceOpts{
@@ -53,17 +50,15 @@ func (m *Dogger) BoundTo(
 	// +optional
 	installDockerCli bool,
 ) *dagger.Container {
-	return dag.
-		Container().
-		From("docker:cli").
-		WithServiceBinding(alias, m.AsService()).
+	return container.
+		WithServiceBinding(alias, m.Service()).
 		WithEnvVariable("DOCKER_HOST", m.DockerHost(alias)).
 		With(func(c *dagger.Container) *dagger.Container {
 			if installDockerCli {
 				return c.WithFile(
 					"/usr/local/bin/docker",
 					dag.Container().
-						From("docker:cli").
+						From("docker.io/library/docker:cli").
 						File("/usr/local/bin/docker"),
 				)
 			}
@@ -76,5 +71,5 @@ func (m *Dogger) BoundTo(
 }
 
 func (m *Dogger) Playground() *dagger.Container {
-	return m.BoundTo(dag.Container().From("docker:cli"), "dogger", false)
+	return m.BoundTo(dag.Container().From("docker.io/library/docker:cli"), "dogger", false)
 }

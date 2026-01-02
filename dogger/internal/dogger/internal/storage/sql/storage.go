@@ -51,6 +51,14 @@ func (s *Storage) createTables() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 		)`,
+		`CREATE TABLE IF NOT EXISTS container_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			container_id INTEGER NOT NULL,
+			stream INTEGER NOT NULL,
+			line TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE
+		)`,
 	}
 
 	for _, query := range queries {

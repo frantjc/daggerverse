@@ -1,14 +1,10 @@
 {
-  "name": "dogger",
+  "name": "release",
   "engineVersion": "v0.19.8",
   "sdk": {
     "source": "go"
   },
   "dependencies": [
-    {
-      "name": "dogger-dev",
-      "source": "internal/dogger"
-    },
     {
       "name": "wolfi",
       "source": "github.com/dagger/dagger/modules/wolfi@v0.19.8",

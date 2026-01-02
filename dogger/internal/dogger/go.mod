@@ -3,7 +3,7 @@ module github.com/frantjc/daggerverse/dogger/internal/dogger
 go 1.25.2
 
 require (
-	dagger.io/dagger v0.19.6
+	dagger.io/dagger v0.19.8
 	github.com/containerd/log v0.1.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v28.5.1+incompatible
@@ -13,7 +13,10 @@ require (
 	github.com/moby/go-archive v0.1.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.1
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	github.com/vito/go-sse v1.1.3
+	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/proto/otlp v1.8.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/sync v0.17.0
@@ -73,14 +76,11 @@ require (
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
-	github.com/spf13/pflag v1.0.10
 	github.com/vbatts/tar-split v0.12.2 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.30 // indirect
-	github.com/vito/go-sse v1.1.3
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0 // indirect
 	go.opentelemetry.io/contrib/processors/baggagecopy v0.11.0 // indirect
-	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0 // indirect

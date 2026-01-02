@@ -21,7 +21,9 @@ import (
 	"github.com/google/uuid"
 	archive "github.com/moby/go-archive"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
 
 var (
@@ -97,7 +99,7 @@ func (c *ContainerBackend) ContainerCreate(ctx context.Context, config backend.C
 		Created:    time.Now(),
 		Config:     *config.Config,
 		HostConfig: hostConfig,
-		Platform: platform,
+		Platform:   platform,
 	}); err != nil {
 		return containertypes.CreateResponse{}, err
 	}
@@ -214,9 +216,19 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 		return err
 	}
 
-	dag, err := dagutil.Connect(ctx, func(req *collogspb.ExportLogsServiceRequest) {
-		fmt.Println(req.String())
-	})
+	ctx, span := otel.Tracer("").Start(ctx, "repro")
+	defer span.End()
+
+	var _ = span.SpanContext().SpanID().String() // spanID. All logs from this span and its children are from the service.
+
+	dag, err := dagutil.Connect(ctx,
+		func(req *collogspb.ExportLogsServiceRequest) {
+			// TODO(frantjc) Store logs retrievable as a log chan and an io.Reader by children of a given spanID.
+		},
+		func(req *coltracepb.ExportTraceServiceRequest) {
+			// TODO(frantjc): Track span lineage.
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -256,11 +268,11 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 	svc := container.
 		AsService(dagger.ContainerAsServiceOpts{
 			UseEntrypoint:                 len(config.Entrypoint) == 0,
-			Args: append(config.Entrypoint, config.Cmd...),
+			Args:                          append(config.Entrypoint, config.Cmd...),
 			ExperimentalPrivilegedNesting: true,
 			InsecureRootCapabilities:      hostConfig.Privileged,
 		})
-		
+
 	if config.Hostname != "" {
 		svc, err = svc.
 			WithHostname(config.Hostname).

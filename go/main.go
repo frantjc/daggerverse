@@ -88,12 +88,7 @@ func New(
 	return m.WithSource(ctx, module)
 }
 
-func (m *Go) WithSource(
-	ctx context.Context,
-	// +optional
-	// +defaultPath="."
-	source *dagger.Directory,
-) (*Go, error) {
+func (m *Go) WithSource(ctx context.Context, source *dagger.Directory) (*Go, error) {
 	goModContents, err := source.File("go.mod").Contents(ctx)
 	if err != nil {
 		return nil, err

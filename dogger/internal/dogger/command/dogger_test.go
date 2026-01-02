@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/command"
-	"github.com/stretchr/testify/assert"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDogger(t *testing.T) {

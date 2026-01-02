@@ -15,12 +15,12 @@ func (c ContainerStatus) Status() string {
 }
 
 type Container struct {
-	ID          string
-	ServiceID   string
-	Created     time.Time
-	Config      containertypes.Config
-	HostConfig  containertypes.HostConfig
-	Platform                    ocispec.Platform
+	ID         string
+	ServiceID  string
+	Created    time.Time
+	Config     containertypes.Config
+	HostConfig containertypes.HostConfig
+	Platform   ocispec.Platform
 }
 
 type Image struct {

@@ -16,11 +16,11 @@ func New(githubToken *dagger.Secret) *Gh {
 }
 
 type Release struct {
-	gh *Gh
+	githubToken *dagger.Secret
 }
 
 func (m *Gh) Release() *Release {
-	return &Release{gh: m}
+	return &Release{githubToken: m.githubToken}
 }
 
 func (m *Release) Create(ctx context.Context,
@@ -35,7 +35,7 @@ func (m *Release) Create(ctx context.Context,
 		Container(dagger.WolfiContainerOpts{
 			Packages: []string{"gh"},
 		}).
-		WithSecretVariable("GITHUB_TOKEN", m.gh.githubToken).
+		WithSecretVariable("GITHUB_TOKEN", m.githubToken).
 		WithExec([]string{"gh", "release", repoArg, "create", tag, "--generate-notes", "--draft"})
 
 	for _, asset := range assets {

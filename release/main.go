@@ -142,16 +142,17 @@ func (m *Release) Create(
 
 	for _, gs := range goos {
 		for _, ga := range goarch {
-			bin := upx.Pack(
-				dagg3r.
-					WithDirectory(".", module).
-					WithExec(
-						[]string{"dagger", "call", "binary", "--version", data.Version, "--goos", gs, "--goarch", ga, "export", "--path", data.Name},
-						dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
-					).
-					File(data.Name),
-				dagger.UpxPackOpts{},
-			)
+			bin := dagg3r.
+				WithDirectory(".", module).
+				WithExec(
+					[]string{"dagger", "call", "binary", "--version", data.Version, "--goos", gs, "--goarch", ga, "export", "--path", data.Name},
+					dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
+				).
+				File(data.Name)
+
+			if gs == "linux" {
+				bin = upx.Pack(bin)
+			}
 
 			file := fmt.Sprintf("%s-%s-%s-%s.tar.gz", data.Name, data.Version, gs, ga)
 			asset := tar.

@@ -164,7 +164,7 @@ func (m *Release) Create(
 					},
 				)
 
-			sha256sum, err := wolfi.WithFile("asset", asset).WithExec([]string{"sha256sum", "asset"}).Stdout(ctx)
+			sha256sum, err := wolfi.WithFile(file, asset).WithExec([]string{"sha256sum", file}).Stdout(ctx)
 			if err != nil {
 				return err
 			}
@@ -214,15 +214,30 @@ func (m *Release) Create(
 
 		owner, _, _ := strings.Cut(githubRepo, "/")
 
-		if _, err := gh.Container().
-			WithExec([]string{
+		endpoint := fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s.rb", owner, data.Name)
+		upload := []string{
 				"gh",
 				"api",
-				fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s.rb", owner, data.Name),
 				"-X=PUT",
 				"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
 				"-f", fmt.Sprintf("content=%s", buf.String()),
-		}).
+		}
+		
+		if sha, err := gh.Container().
+			WithExec([]string{
+				"gh",
+				"api",
+				endpoint,
+				"--jq",
+				".sha",
+			}).
+			Stdout(ctx); err == nil {
+			upload = append(upload, "-f", fmt.Sprintf("sha=%s", strings.TrimSpace(sha)))
+		}
+		var _ = []string{"gh", "api", endpoint, "--jq", ".sha"}
+
+		if _, err := gh.Container().
+			WithExec(upload).
 			Sync(ctx); err != nil {
 			return err
 		}

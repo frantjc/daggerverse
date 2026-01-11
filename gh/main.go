@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/frantjc/daggerverse/gh/internal/dagger"
 )
@@ -38,7 +39,9 @@ func (m *Release) Create(ctx context.Context,
 ) error {
 	arg := fmt.Sprintf("-R=%s", repo)
 
-	release := m.Gh.Container.WithExec([]string{"gh", "release", arg, "create", tag, "--generate-notes", "--draft"})
+	release := m.Gh.Container.
+		WithEnvVariable("BUST", time.Now().String()).
+		WithExec([]string{"gh", "release", arg, "create", tag, "--generate-notes", "--draft"})
 
 	for _, asset := range assets {
 		file, err := asset.Name(ctx)

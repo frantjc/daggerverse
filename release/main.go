@@ -77,12 +77,13 @@ func (m *Release) Create(
 	}
 	data.Version = strings.TrimPrefix(ref, "refs/tags/")
 
-	data.Description, err = gh.Container().
+	description, err := gh.Container().
 		WithExec([]string{"gh", "repo", "view", githubRepo, "--json", "description", "--jq", ".description"}).
 		Stdout(ctx)
 	if err != nil {
 		return err
 	}
+	data.Description = strings.TrimSpace(description)
 
 	assets := []*dagger.File{}
 	checksumsTxt := new(strings.Builder)

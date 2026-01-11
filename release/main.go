@@ -13,7 +13,12 @@ import (
 )
 
 type Release struct {
+	// +private
 	Source *dagger.GitRef
+}
+
+func New(src *dagger.GitRef) *Release {
+	return &Release{Source: src}
 }
 
 var (

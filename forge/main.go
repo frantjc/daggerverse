@@ -13,7 +13,6 @@ import (
 	"github.com/frantjc/forge"
 	"github.com/frantjc/forge/githubactions"
 	"github.com/frantjc/forge/envconv"
-	"golang.org/x/mod/modfile"
 	"sigs.k8s.io/yaml"
 )
 
@@ -474,34 +473,13 @@ func (a *FinalizedAction) Output(ctx context.Context) (string, error) {
 func withShim(ctx context.Context, container *dagger.Container) (*dagger.Container, error) {
 	src := dag.CurrentModule().Source()
 
-	contents, err := src.File("go.mod").Contents(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	gomod, err := modfile.Parse("go.mod", []byte(contents), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	golang := dag.Container().
-		From(fmt.Sprintf("docker.io/library/golang:%s", gomod.Go.Version))
-
-	workdir := path.Join("$GOPATH", "src", gomod.Module.Mod.Path)
-
-	shim := golang.
-		WithEnvVariable("CGO_ENABLED", "0").
-		WithDirectory(workdir, src, dagger.ContainerWithDirectoryOpts{
-			Expand: true,
-			Include: []string{
-				"go.mod",
-				"go.sum",
-				"cmd/shim/**",
-			},
-		}).
-		WithWorkdir(workdir, dagger.ContainerWithWorkdirOpts{Expand: true}).
-		WithExec([]string{"go", "build", "-o", shimPath, "./cmd/shim"}).
-		File(shimPath)
+	shim := dag.Go(dagger.GoOpts{
+		Module: src,
+		AdditionalWolfiPackages: []string{"gcc"},
+	}).
+		Build(dagger.GoBuildOpts{
+			Pkg:     "./cmd/shim",
+		})
 
 	return container.WithFile(shimPath, shim), nil
 }

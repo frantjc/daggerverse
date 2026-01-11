@@ -8,24 +8,16 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type ContainerStatus int
-
-func (c ContainerStatus) Status() string {
-	return "unknown"
-}
-
 type Container struct {
 	ID         string
-	ServiceID  string
+	SpanID     string
 	Created    time.Time
 	Config     containertypes.Config
 	HostConfig containertypes.HostConfig
 	Platform   ocispec.Platform
 }
 
-type Image struct {
-	ContainerID string
-}
+type Image struct {}
 
 type ImageStore interface {
 	CreateImage(context.Context, string, *Image) error

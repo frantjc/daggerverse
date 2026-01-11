@@ -5,6 +5,10 @@ dogger: $(DOGGER)
 $(DOGGER): $(LOCALBIN)
 	@dagger call binary export --path $(DOGGER)
 
+.PHONY: dev
+dev: dogger
+	@$(DOGGER) --debug
+
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	@mkdir -p $(LOCALBIN)

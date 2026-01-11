@@ -1,6 +1,6 @@
 {
   "name": "dogger",
-  "engineVersion": "v0.19.8",
+  "engineVersion": "v0.19.9",
   "sdk": {
     "source": "go"
   },
@@ -11,7 +11,7 @@
     },
     {
       "name": "wolfi",
-      "source": "github.com/dagger/dagger/modules/wolfi@v0.19.8",
+      "source": "github.com/dagger/dagger/modules/wolfi@v0.19.9",
       "pin": "1c8379708f82e0f1543fbc0a806b4b995793e55b"
     }
   ]

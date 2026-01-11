@@ -13,12 +13,12 @@ import (
 	imagetypes "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/image"
+	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/dagutil"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/storage"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ImageBackend struct {
-	Client  *dagger.Client
 	Storage storage.ImageStore
 }
 
@@ -71,9 +71,12 @@ func (i *ImageBackend) LoadImage(ctx context.Context, inTar io.ReadCloser, platf
 
 // PullImage implements image.Backend.
 func (i *ImageBackend) PullImage(ctx context.Context, ref reference.Named, platform *v1.Platform, metaHeaders map[string][]string, authConfig *registry.AuthConfig, outStream io.Writer) error {
-	dag := i.Client
+	dag, err := dagutil.Connect(ctx, nil, nil)
+	if err != nil {
+		return err
+	}
 
-	container := dag.Container(dagger.ContainerOpts{Platform: getDaggerPlatform(platform)})
+	container := dag.Container(getContainerOpts(platform)...)
 
 	if authConfig != nil {
 		container = container.WithRegistryAuth(
@@ -100,13 +103,14 @@ func (i *ImageBackend) TagImage(ctx context.Context, id image.ID, newRef referen
 	return ErrUnimplemented
 }
 
-func getDaggerPlatform(p *v1.Platform) dagger.Platform {
-	platform := ""
-	if p != nil {
-		platform = fmt.Sprintf("%s/%s", p.OS, p.Architecture)
+func getContainerOpts(p *v1.Platform) []dagger.ContainerOpts {
+	opts := []dagger.ContainerOpts{}
+	if p != nil && p.OS != "" && p.Architecture != "" {
+		platform := fmt.Sprintf("%s/%s", p.OS, p.Architecture)
 		if p.OSVersion != "" {
 			platform = fmt.Sprintf("%s/%s", platform, p.OSVersion)
 		}
+		opts = append(opts, dagger.ContainerOpts{Platform: dagger.Platform(platform)})
 	}
-	return dagger.Platform(platform)
+	return opts
 }

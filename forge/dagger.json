@@ -1,7 +1,13 @@
 {
   "name": "forge",
-  "engineVersion": "v0.19.8",
+  "engineVersion": "v0.19.9",
   "sdk": {
     "source": "go"
-  }
+  },
+  "dependencies": [
+    {
+      "name": "go",
+      "source": "../go"
+    }
+  ]
 }

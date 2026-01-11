@@ -22,9 +22,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type LogCallback func(*collogspb.ExportLogsServiceRequest)
+type LogCallback func(context.Context, *collogspb.ExportLogsServiceRequest) error
 
-type TraceCallback func(*coltracepb.ExportTraceServiceRequest)
+type TraceCallback func(context.Context, *coltracepb.ExportTraceServiceRequest) error
 
 func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Client, error) {
 	log := logutil.SloggerFrom(ctx)
@@ -69,7 +69,7 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 						continue
 					}
 
-					l(&req)
+					l(ctx, &req)
 				}
 			}()
 		}
@@ -107,7 +107,7 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 					continue
 				}
 
-				t(&req)
+				t(ctx, &req)
 			}
 		}()
 
@@ -138,7 +138,7 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 				return
 			}
 
-			l(&req)
+			l(ctx, &req)
 		})
 
 		opts = append(opts,
@@ -162,7 +162,7 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 				return
 			}
 
-			t(&req)
+			t(ctx, &req)
 		})
 
 		opts = append(opts,

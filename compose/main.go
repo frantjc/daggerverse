@@ -52,28 +52,29 @@ func (m *Compose) Up(
 	// +optional
 	services ...string,
 ) (*dagger.Service, error) {
+	tmp, err:= os.MkdirTemp("", "src")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+
+	if _, err = m.Source.Export(ctx, tmp); err != nil {
+		return nil, err
+	}
+
 	env := make(types.Mapping)
 	for _, e := range m.Env {
 		env[e.Name] = e.Value
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err = m.Source.Export(ctx, wd); err != nil {
-		return nil, err
-	}
-
 	loaderConfig := types.ConfigDetails{
 		Version:     "3",
-		WorkingDir:  wd,
+		WorkingDir:  tmp,
 		Environment: env,
 	}
 
 	for _, f := range m.Files {
-		content, err := m.Source.File(f).Contents(ctx)
+		content, err := os.ReadFile(filepath.Join(tmp, f))
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,7 @@ func (m *Compose) Up(
 			continue
 		}
 
-		svc, err := m.convert(project, composeSvc)
+		svc, err := m.convert(project, composeSvc, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +131,7 @@ func (m *Compose) Up(
 	return proxy.Service(), nil
 }
 
-func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dagger.Service, error) {
+func (m *Compose) convert(project *types.Project, svc types.ServiceConfig, tmp string) (*dagger.Service, error) {
 	container := dag.Container()
 
 	if svc.Image != "" {
@@ -197,15 +198,10 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 		container = container.WithExposedPort(port)
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
 	for _, vol := range svc.Volumes {
 		switch vol.Type {
 		case types.VolumeTypeBind:
-			source, err := filepath.Rel(wd, vol.Source)
+			source, err := filepath.Rel(tmp, vol.Source)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +220,7 @@ func (m *Compose) convert(project *types.Project, svc types.ServiceConfig) (*dag
 			return nil, err
 		}
 
-		svc, err := m.convert(project, cfg)
+		svc, err := m.convert(project, cfg, tmp)
 		if err != nil {
 			return nil, err
 		}

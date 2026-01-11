@@ -8,12 +8,24 @@ import (
 )
 
 type Gh struct {
-	// +private
-	GitHubToken *dagger.Secret
+	Container *dagger.Container
 }
 
+const (
+	group = "gh"
+	user  = group
+	home  = "/home/" + user
+)
+
 func New(githubToken *dagger.Secret) *Gh {
-	return &Gh{GitHubToken: githubToken}
+	return &Gh{
+		Container: dag.Wolfi().
+		Container(dagger.WolfiContainerOpts{
+			Packages: []string{"gh"},
+		}).
+		WithEnvVariable("HOME", home).
+		WithSecretVariable("GITHUB_TOKEN", githubToken),
+	}
 }
 
 type Release struct {
@@ -33,12 +45,7 @@ func (m *Release) Create(ctx context.Context,
 ) error {
 	repoArg := fmt.Sprintf("-R=%s", repo)
 
-	release := dag.Wolfi().
-		Container(dagger.WolfiContainerOpts{
-			Packages: []string{"gh"},
-		}).
-		WithSecretVariable("GITHUB_TOKEN", m.Gh.GitHubToken).
-		WithExec([]string{"gh", "release", repoArg, "create", tag, "--generate-notes", "--draft"})
+	release := m.Gh.Container.WithExec([]string{"gh", "release", repoArg, "create", tag, "--generate-notes", "--draft"})
 
 	for _, asset := range assets {
 		file, err := asset.Name(ctx)

@@ -11,17 +11,21 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"dagger.io/dagger/telemetry"
 	containerrouter "github.com/docker/docker/api/server/router/container"
 	"github.com/docker/docker/api/types/backend"
 	containertypes "github.com/docker/docker/api/types/container"
 	filterstypes "github.com/docker/docker/api/types/filters"
 	networktypes "github.com/docker/docker/api/types/network"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/dagutil"
+	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/logutil"
 	"github.com/frantjc/daggerverse/dogger/internal/dogger/internal/storage"
 	"github.com/google/uuid"
 	archive "github.com/moby/go-archive"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/trace"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
@@ -35,6 +39,122 @@ type ContainerBackend struct {
 	Context context.Context
 	// Storage is where data about the containers gets kept.
 	Storage storage.ContainerStore
+
+	spanTree spanTree
+	logRecords []log.Record
+	// TODO(frantjc): Use this to both remember log records and stream them to clients who currently want them.
+	logExporters logExporters
+}
+
+type logExporters map[string]log.Exporter
+
+func (e logExporters) Export(ctx context.Context, records []log.Record) (err error) {
+	for _, logExporter := range e {
+		err = errors.Join(err, logExporter.Export(ctx, records))
+	}
+	return
+}
+func (e logExporters) Shutdown(ctx context.Context) (err error) {
+	for _, logExporter := range e {
+		err = errors.Join(err, logExporter.Shutdown(ctx))
+	}
+	return
+}
+func (e logExporters) ForceFlush(ctx context.Context) (err error) {
+	for _, logExporter := range e {
+		err = errors.Join(err, logExporter.ForceFlush(ctx))
+	}
+	return
+}
+
+type writerLogExporter struct {
+	io.Writer
+	lineage map[string]struct{}
+}
+
+func (e *writerLogExporter) Export(ctx context.Context, records []log.Record) error {
+	for _, record := range records {
+		if _, ok := e.lineage[record.SpanID().String()]; ok {
+			if _, err := e.Writer.Write([]byte(record.Body().String())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+func (e *writerLogExporter) Shutdown(ctx context.Context) error {
+	if wc, ok := e.Writer.(io.WriteCloser); ok {
+		return wc.Close()
+	}
+	return nil
+}
+func (e *writerLogExporter) ForceFlush(ctx context.Context) error {
+	return e.Shutdown(ctx)
+}
+
+type containerBackendLogExporter struct {
+	*ContainerBackend
+}
+
+func (e *containerBackendLogExporter) Export(ctx context.Context, records []log.Record) error {
+	e.logRecords = append(e.logRecords, records...)
+	return e.logExporters.Export(ctx, records)
+}
+func (e *containerBackendLogExporter) Shutdown(ctx context.Context) error {
+	return e.logExporters.Shutdown(ctx)
+}
+func (e *containerBackendLogExporter) ForceFlush(ctx context.Context) error {
+	return e.logExporters.ForceFlush(ctx)
+}
+
+func (c *ContainerBackend) exportLogs(ctx context.Context, req *collogspb.ExportLogsServiceRequest) error {
+	// FIXME(frantjc): This strips off the stream and EOF metadata, meaning that
+	// the consuming log.Exporters are unable to differentiate between streams.
+	if err := telemetry.ReexportLogsFromPB(ctx, &containerBackendLogExporter{c}, req); err != nil {
+		return err
+	}
+	return nil
+}
+
+type spanTree map[string][]string
+
+func (s spanTree) Add(span trace.ReadOnlySpan) {
+	parentSpanID := span.SpanContext().SpanID().String()
+	spanID := span.SpanContext().SpanID().String()
+	if childSpanIDs, ok := s[parentSpanID]; !ok {
+		s[parentSpanID] = []string{spanID}
+	} else {
+		s[parentSpanID] = append(childSpanIDs, spanID)
+		s[spanID] = []string{}
+	}
+}
+
+// Lineage returns a map of all spanIDs that are descendants of the given spanID.
+func (s spanTree) Lineage(spanID string) map[string]struct{} {
+	return s.lineage(spanID, map[string]struct{}{})
+}
+
+func (s spanTree) lineage(spanID string, lineage map[string]struct{}) map[string]struct{} {
+	lineage[spanID] = struct{}{}
+	for {
+		childSpanIDs, ok := s[spanID]
+		if !ok {
+			return lineage
+		}
+		for _, childSpanID := range childSpanIDs {
+			s.lineage(childSpanID, lineage)
+		}
+	}
+}
+
+func (c *ContainerBackend) exportTraces(ctx context.Context, req *coltracepb.ExportTraceServiceRequest) error {
+	if c.spanTree == nil {
+		c.spanTree = make(spanTree)
+	}
+	for _, span := range telemetry.SpansFromPB(req.GetResourceSpans()) {
+		c.spanTree.Add(span)
+	}
+	return nil
 }
 
 var _ containerrouter.Backend = new(ContainerBackend)
@@ -49,22 +169,55 @@ func (c *ContainerBackend) ContainerAttach(name string, cfg *backend.ContainerAt
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
-	data, err := c.Storage.GetContainer(ctx, name)
+	log := logutil.SloggerFrom(ctx)
+
+	log.Info("ATTACH")
+
+	stdin, stdout, stderr, err := cfg.GetStreams(cfg.MuxStreams, cancel)
 	if err != nil {
 		return err
 	}
 
-	stdin, stdout, stderr, err := cfg.GetStreams(false, cancel)
-	if err != nil {
-		return err
-	}
+	log.Info("ATTACHED")
+	fmt.Fprint(stdout, "ATTACHED")
+	fmt.Fprint(stderr, "ATTACHED")
 
 	var (
-		_ = data
 		_ = stdin
 		_ = stdout
 		_ = stderr
 	)
+
+	for {
+		data, err := c.Storage.GetContainer(ctx, name)
+		if err != nil {
+			return err
+		}
+
+		log.Info("got data")
+
+		if data.SpanID == "" {
+			continue
+		}
+
+		log.Info("got span ID")
+
+		lineage := c.spanTree.Lineage(data.SpanID)
+
+		k := uuid.NewString()
+		if c.logExporters == nil {
+			c.logExporters = make(logExporters)
+		}
+		logExporter := &writerLogExporter{Writer: stdout, lineage: lineage}
+		if err := logExporter.Export(ctx, c.logRecords); err != nil {
+			return err
+		}
+		c.logExporters[k] = logExporter
+		defer delete(c.logExporters, k)
+		break
+	}
+
+	<-ctx.Done()
 
 	return nil
 }
@@ -216,19 +369,12 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 		return err
 	}
 
-	ctx, span := otel.Tracer("").Start(ctx, "repro")
+	ctx, span := otel.Tracer("").Start(ctx, name)
 	defer span.End()
 
-	var _ = span.SpanContext().SpanID().String() // spanID. All logs from this span and its children are from the service.
+	data.SpanID = span.SpanContext().SpanID().String()
 
-	dag, err := dagutil.Connect(ctx,
-		func(req *collogspb.ExportLogsServiceRequest) {
-			// TODO(frantjc) Store logs retrievable as a log chan and an io.Reader by children of a given spanID.
-		},
-		func(req *coltracepb.ExportTraceServiceRequest) {
-			// TODO(frantjc): Track span lineage.
-		},
-	)
+	dag, err := dagutil.Connect(ctx, c.exportLogs, c.exportTraces)
 	if err != nil {
 		return err
 	}
@@ -238,14 +384,26 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 	platform := &data.Platform
 
 	container := dag.
-		Container(dagger.ContainerOpts{
-			Platform: getDaggerPlatform(platform),
-		}).
+		Container(getContainerOpts(platform)...).
 		From(config.Image)
 
 	for exposedPort := range config.ExposedPorts {
 		container = container.WithExposedPort(exposedPort.Int(), dagger.ContainerWithExposedPortOpts{
 			Protocol: dagger.NetworkProtocol(exposedPort.Proto()),
+			// TODO(frantjc): Do we want to skip the health check of explicitly exposed ports?
+			ExperimentalSkipHealthcheck: true,
+		})
+	}
+
+	// container.AsService errors if there are no ports exposed, so we pick a random
+	// ephemeral port. Ref: https://en.wikipedia.org/wiki/Ephemeral_port#Range.
+	if len(config.ExposedPorts) == 0 {
+		maxRandPort := 60999
+		minRandPort := 32768
+		randPortRangeSize := maxRandPort - minRandPort
+		randPort := rand.IntN(minRandPort) + randPortRangeSize
+		container = container.WithExposedPort(randPort, dagger.ContainerWithExposedPortOpts{
+			ExperimentalSkipHealthcheck: true,
 		})
 	}
 
@@ -290,12 +448,12 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 		if err != nil {
 			return err
 		}
-
-		if err = c.Storage.UpdateContainer(ctx, name, data); err != nil {
-			return err
-		}
 	}
 
+	if err = c.Storage.UpdateContainer(ctx, name, data); err != nil {
+		return err
+	}
+	
 	return nil
 }
 
@@ -331,12 +489,10 @@ func (c *ContainerBackend) ContainerUpdate(name string, hostConfig *containertyp
 
 // ContainerWait implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerWait(ctx context.Context, name string, condition containertypes.WaitCondition) (<-chan containertypes.StateStatus, error) {
-	// TODO(frantjc)
-	exitCode := 0
-
+	log := logutil.SloggerFrom(ctx)
+	log.Info("WAIT")
+	// TODO(frantjc).
 	statuses := make(chan containertypes.StateStatus)
-	statuses <- containertypes.NewStateStatus(exitCode, nil)
-
 	return statuses, nil
 }
 

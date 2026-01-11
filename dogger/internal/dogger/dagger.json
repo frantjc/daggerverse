@@ -1,14 +1,13 @@
 {
   "name": "dogger-dev",
-  "engineVersion": "v0.19.8",
+  "engineVersion": "v0.19.9",
   "sdk": {
     "source": "go"
   },
   "dependencies": [
     {
       "name": "go",
-      "source": "github.com/frantjc/daggerverse/go@main",
-      "pin": "20fda2ff7672c789fc919ff018abf03c1a447cfb"
+      "source": "../../../go"
     }
   ],
   "source": ".dagger"

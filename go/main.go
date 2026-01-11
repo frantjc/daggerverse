@@ -5,7 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/frantjc/daggerverse/go/internal/dagger"
@@ -80,8 +80,8 @@ func New(
 			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
 	}
 
-
 	if module == nil {
+		m.Container = m.Container.WithWorkdir("$GOPATH", dagger.ContainerWithWorkdirOpts{Expand: true})
 		return m, nil
 	}
 
@@ -101,13 +101,14 @@ func (m *Go) WithSource(ctx context.Context, source *dagger.Directory) (*Go, err
 
 	return &Go{
 		Container: m.Container.
-			WithWorkdir(path.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
+			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", source).
 			WithExec([]string{"go", "mod", "download"}),
 	}, nil
 }
 
 func (m *Go) Build(
+	ctx context.Context,
 	// +optional
 	// +default="./"
 	pkg string,
@@ -121,15 +122,24 @@ func (m *Go) Build(
 	// +optional
 	goos string,
 ) (*dagger.File, error) {
-	outputPath := "$GOBIN/output"
-
-	cgoEnabled := "0"
-	if cgo {
-		cgoEnabled = "1"
+	output := fmt.Sprintf("$GOBIN/%s", filepath.Base(pkg))
+	if filepath.Ext(pkg) == ".go" {
+		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(filepath.Dir(pkg)))
+	} else if pkg == "./" || pkg == "." {
+		workdir, err := m.Container.Workdir(ctx)
+		if err != nil {
+			return nil, err
+		}
+		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(workdir))
 	}
 
 	return m.Container.
-		WithEnvVariable("CGO_ENABLED", cgoEnabled).
+		With(func(r *dagger.Container) *dagger.Container {
+			if !cgo {
+				return r.WithEnvVariable("CGO_ENABLED", "0")
+			}
+			return r
+		}).
 		With(func(c *dagger.Container) *dagger.Container {
 			if goos != "" {
 				c = c.WithEnvVariable("GOOS", goos)
@@ -139,6 +149,6 @@ func (m *Go) Build(
 			}
 			return c
 		}).
-		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", outputPath, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
-		File(outputPath, dagger.ContainerFileOpts{Expand: true}), nil
+		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", output, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
+		File(output, dagger.ContainerFileOpts{Expand: true}), nil
 }

@@ -163,10 +163,12 @@ func (m *Release) Create(
 					},
 				)
 
-			checksum, err := asset.Digest(ctx)
+			sha256sum, err := wolfi.WithFile("asset", asset).WithExec([]string{"sha256sum", "asset"}).Stdout(ctx)
 			if err != nil {
 				return err
 			}
+
+			checksum, _, _ := strings.Cut(sha256sum, "  ")
 
 			if _, err = fmt.Fprintln(checksumsTxt, file, checksum); err != nil {
 				return err
@@ -177,7 +179,7 @@ func (m *Release) Create(
 			}
 			osArchData := tplOsArchData{
 				URL: fmt.Sprintf("%s/releases/download/%s/%s", data.Homepage, data.Version, file),
-				Sha256: checksum,
+				Sha256: strings.TrimPrefix(checksum, "sha256:"),
 			}
 			if _, ok := data.OsArch[gs]; ok {
 				data.OsArch[gs][ga] = osArchData

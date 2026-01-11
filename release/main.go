@@ -154,19 +154,24 @@ func (m *Release) Create(
 							data.Name,
 							bin,
 						),
-					dagger.TarCreateOpts{Compress: true},
-				).
-				WithName(file)
+					dagger.TarCreateOpts{
+						Compress: true,
+						Name: file,
+					},
+				)
 
 			checksum, err := asset.Digest(ctx)
 			if err != nil {
 				return err
 			}
 
+			if _, err = fmt.Fprintln(checksumsTxt, file, checksum); err != nil {
+				return err
+			}
+
 			if data.OsArch == nil {
 				data.OsArch = map[string]map[string]tplOsArchData{}
 			}
-		
 			osArchData := tplOsArchData{
 				URL: fmt.Sprintf("%s/releases/download/%s/%s", data.Homepage, data.Version, file),
 				Sha256: checksum,
@@ -175,10 +180,6 @@ func (m *Release) Create(
 				data.OsArch[gs][ga] = osArchData
 			} else {
 				data.OsArch[gs] = map[string]tplOsArchData{ga: osArchData}
-			}
-
-			if _, err = fmt.Fprintln(checksumsTxt, file, checksum); err != nil {
-				return err
 			}
 
 			assets = append(assets, asset)

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/frantjc/daggerverse/tar/internal/dagger"
 )
 
@@ -17,16 +19,21 @@ func New() (*Tar, error) {
 func (m *Tar) Create(
 	directory *dagger.Directory,
 	// +optional
+	name string,
+	// +optional
 	compress bool,
 ) *dagger.File {
-	in := "$HOME/in"
+	in := "/in"
 	exec := []string{"tar", "-C", in}
-	out := "$HOME/out.tar"
+	out := "/out.tar"
 	if compress {
 		out += ".gz"
 		exec = append(exec, "-czf")
 	} else {
 		exec = append(exec, "-cf")
+	}
+	if name != "" {
+		out = fmt.Sprintf("/%s", name)
 	}
 	exec = append(exec, out, ".")
 	return m.Container.

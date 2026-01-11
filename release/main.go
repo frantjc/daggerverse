@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	_ "embed"
 	"fmt"
 	"path/filepath"
@@ -55,6 +56,8 @@ func (m *Release) Create(
 	// "arm64"
 	// ]
 	goarch []string,
+	// +optional
+	brew bool,
 ) error {
 	tpl, err := template.New("cask").Parse(caskRbTpl)
 	if err != nil {
@@ -188,36 +191,43 @@ func (m *Release) Create(
 
 	assets = append(assets, dag.File("checksums.txt", checksumsTxt.String()))
 
-	buf := new(bytes.Buffer)
-
-	if err := tpl.Execute(buf, data); err != nil {
-		return err
-	}
-
 	if err := gh.
 		Release().
 		Create(ctx, data.Version, githubRepo, dagger.GhReleaseCreateOpts{Assets: assets}); err != nil {
 		return err
 	}
 
-	owner, _, _ := strings.Cut(githubRepo, "/")
+	if brew {
+		buf := new(bytes.Buffer)
+		enc := base64.NewEncoder(base64.StdEncoding, buf)
 
-	cask := fmt.Sprintf("%s.rb", data.Name)
-	if _, err := gh.Container().
-		WithFile(
-			cask,
-			dag.File(cask, buf.String()),
-		).
-		WithExec([]string{
-			"gh",
-			"api",
-			fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s", owner, cask),
-			"-X=PUT",
-  			"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
-			"-f", fmt.Sprintf("content=@%s", cask),
-  }).
-		Sync(ctx); err != nil {
-		return err
+		if err := tpl.Execute(enc, data); err != nil {
+			return err
+		}
+
+		if err = enc.Close(); err != nil {
+			return err
+		}
+
+		owner, _, _ := strings.Cut(githubRepo, "/")
+
+		cask := fmt.Sprintf("%s.rb.b64", data.Name)
+		if _, err := gh.Container().
+			WithFile(
+				cask,
+				dag.File(cask, buf.String()),
+			).
+			WithExec([]string{
+				"gh",
+				"api",
+				fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s", owner, cask),
+				"-X=PUT",
+				"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
+				"-f", fmt.Sprintf("content=@%s", cask),
+		}).
+			Sync(ctx); err != nil {
+			return err
+		}
 	}
 
 	return nil

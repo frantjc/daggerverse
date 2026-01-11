@@ -150,6 +150,7 @@ func (m *Release) Create(
 						dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
 					).
 					File(data.Name),
+				dagger.UpxPackOpts{},
 			)
 
 			file := fmt.Sprintf("%s-%s-%s-%s.tar.gz", data.Name, data.Version, gs, ga)
@@ -168,6 +169,7 @@ func (m *Release) Create(
 								Permissions: 0755,
 							},
 						),
+					dagger.TarCreateOpts{Compress: true},
 				).
 				WithName(file)
 

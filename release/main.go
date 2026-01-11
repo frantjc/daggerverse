@@ -26,15 +26,6 @@ var (
 	caskRbTpl string
 )
 
-const (
-	gid            = "1001"
-	uid            = gid
-	group          = "release"
-	user           = group
-	owner          = user + ":" + group
-	home           = "/home/" + user
-)
-
 type tplOsArchData struct {
 	URL string
 	Sha256 string
@@ -121,14 +112,9 @@ func (m *Release) Create(
 	tmpDaggerPath := "/tmp/dagger"
 
 	wolfi := dag.Wolfi().
-		Container().
-		WithExec([]string{"addgroup", "-S", "-g", gid, group}).
-		WithExec([]string{"adduser", "-S", "-G", group, "-u", uid, user}).
-		WithEnvVariable("HOME", home)
+		Container()
 	dagg3r := wolfi.
-		WithWorkdir("$HOME", dagger.ContainerWithWorkdirOpts{Expand: true}).
-		WithEnvVariable("PATH", home+"/.local/bin:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", home+"/.local/bin/dagger").
+		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/bin/dagger").
 		WithFile(
 			"$_EXPERIMENTAL_DAGGER_CLI_BIN",
 			wolfi.
@@ -137,7 +123,7 @@ func (m *Release) Create(
 					"tar", "-xzf", tmpDaggerTgzPath, "-C", filepath.Dir(tmpDaggerPath), filepath.Base(tmpDaggerPath),
 				}).
 				File(tmpDaggerPath),
-			dagger.ContainerWithFileOpts{Expand: true, Owner: owner, Permissions: 0700},
+			dagger.ContainerWithFileOpts{Expand: true},
 		)
 
 	for _, gs := range goos {

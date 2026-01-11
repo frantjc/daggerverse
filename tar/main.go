@@ -8,18 +8,9 @@ type Tar struct {
 	Container *dagger.Container
 }
 
-const (
-	group = "tar"
-	user  = group
-	home  = "/home/" + user
-)
-
 func New() (*Tar, error) {
 	return &Tar{
-		Container: dag.Wolfi().
-			Container().
-			WithEnvVariable("HOME", home).
-			WithWorkdir("$HOME", dagger.ContainerWithWorkdirOpts{Expand: true}),
+		Container: dag.Wolfi().Container(),
 	}, nil
 }
 

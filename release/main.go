@@ -165,9 +165,6 @@ func (m *Release) Create(
 						WithFile(
 							data.Name,
 							bin,
-							dagger.DirectoryWithFileOpts{
-								Permissions: 0755,
-							},
 						),
 					dagger.TarCreateOpts{Compress: true},
 				).

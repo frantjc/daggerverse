@@ -36,6 +36,6 @@ func (m *Tar) Create(
 	out := "$HOME/out.tar.gz"
 	return m.Container.
 		WithDirectory(in, directory, dagger.ContainerWithDirectoryOpts{Expand: true}).
-		WithExec([]string{"tar", "-C", in, arg, out}, dagger.ContainerWithExecOpts{Expand: true}).
+		WithExec([]string{"tar", "-C", in, arg, out, "."}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(out, dagger.ContainerFileOpts{Expand: true})
 }

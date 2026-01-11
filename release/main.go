@@ -15,17 +15,8 @@ type Release struct {
 
 var (
 	//go:embed cask.rb.tpl
-	caskRbTpl string
+	CaskRbTpl string
 )
-
-type Cask struct {
-	Homepage string
-	Description string
-	LinuxURL string
-	LinuxSha256 string
-	DarwinURL string
-	DarwinSha256 string
-}
 
 func (m *Release) Create(
 	ctx context.Context,
@@ -34,12 +25,16 @@ func (m *Release) Create(
 	// +optional
 	pkg string,
 	// +optional
-	cgo,
-	// +optional
-	brew bool,
+	cgo bool,
 ) error {
 	gh := dag.Gh(githubToken)
 	module := m.Source.Tree()
+
+	ref, err := m.Source.Ref(ctx)
+	if err != nil {
+		return err
+	}
+	tag := strings.TrimPrefix(ref, "refs/tags/")
 
 	// description, err := gh.Container().
 	// 	WithDirectory(".", module).
@@ -49,15 +44,10 @@ func (m *Release) Create(
 	// 	return err
 	// }
 
-	ref, err := m.Source.Ref(ctx)
-	if err != nil {
-		return err
-	}
-	tag := strings.TrimPrefix(ref, "refs/tags/")
-
 	g0 := dag.Go(dagger.GoOpts{
 		Module: module,
 	})
+	name := ""
 
 	assets := []*dagger.File{}
 	checksumsTxt := new(strings.Builder)
@@ -65,16 +55,18 @@ func (m *Release) Create(
 	for _, goos := range []string{"linux", "darwin"} {
 		for _, goarch := range []string{"amd64", "arm64"} {
 			bin := g0.Build(dagger.GoBuildOpts{
-				Pkg: pkg,
+				Pkg:     pkg,
 				Ldflags: "-s -w -X main.version=" + tag,
-				Cgo: cgo,
-				Goarch: goarch,
-				Goos: goos,
+				Cgo:     cgo,
+				Goarch:  goarch,
+				Goos:    goos,
 			})
 
-			name, err := bin.Name(ctx)
-			if err != nil {
-				return err
+			if name == "" {
+				name, err = bin.Name(ctx)
+				if err != nil {
+					return err
+				}
 			}
 
 			asset := bin.WithName(fmt.Sprintf("%s_%s_%s_%s", name, tag, goos, goarch))
@@ -98,18 +90,12 @@ func (m *Release) Create(
 		}
 	}
 
-
 	assets = append(assets, dag.File("checksums.txt", checksumsTxt.String()))
 
 	if err := gh.
 		Release().
 		Create(ctx, tag, githubRepo, dagger.GhReleaseCreateOpts{Assets: assets}); err != nil {
 		return err
-	}
-
-	if brew {
-		owner, _, _ := strings.Cut(githubRepo, "/")
-		var _ = owner
 	}
 
 	return nil

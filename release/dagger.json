@@ -6,10 +6,6 @@
   },
   "dependencies": [
     {
-      "name": "go",
-      "source": "../go"
-    },
-    {
       "name": "gh",
       "source": "../gh"
     },

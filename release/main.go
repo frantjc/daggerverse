@@ -141,7 +141,7 @@ func (m *Release) Create(
 				dagg3r.
 					WithDirectory(".", module).
 					WithExec(
-						[]string{"dagger", "call", "binary", "--export", data.Name},
+						[]string{"dagger", "call", "binary", "--goos", gs, "--goarch", ga, "--export", data.Name},
 						dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
 					).
 					File(data.Name),

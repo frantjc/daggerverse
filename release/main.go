@@ -211,19 +211,14 @@ func (m *Release) Create(
 
 		owner, _, _ := strings.Cut(githubRepo, "/")
 
-		cask := fmt.Sprintf("%s.rb.b64", data.Name)
 		if _, err := gh.Container().
-			WithFile(
-				cask,
-				dag.File(cask, buf.String()),
-			).
 			WithExec([]string{
 				"gh",
 				"api",
-				fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s", owner, cask),
+				fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s.rb", owner, data.Name),
 				"-X=PUT",
 				"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
-				"-f", fmt.Sprintf("content=@%s", cask),
+				"-f", fmt.Sprintf("content=%s", buf.String()),
 		}).
 			Sync(ctx); err != nil {
 			return err

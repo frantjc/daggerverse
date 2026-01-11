@@ -124,7 +124,8 @@ func (m *Release) Create(
 				}).
 				File(tmpDaggerPath),
 			dagger.ContainerWithFileOpts{Expand: true},
-		)
+		).
+		WithWorkdir("/src")
 
 	for _, gs := range goos {
 		for _, ga := range goarch {

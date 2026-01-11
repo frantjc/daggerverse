@@ -25,11 +25,17 @@ func New() (*Tar, error) {
 
 func (m *Tar) Create(
 	directory *dagger.Directory,
+	// +optional
+	compress bool,
 ) *dagger.File {
+	arg := "-cf"
+	if compress {
+		arg = "-czf"
+	}
 	in := "$HOME/in"
 	out := "$HOME/out.tar.gz"
 	return m.Container.
 		WithDirectory(in, directory, dagger.ContainerWithDirectoryOpts{Expand: true}).
-		WithExec([]string{"tar", "-C", in, "-xzf", out}, dagger.ContainerWithExecOpts{Expand: true}).
+		WithExec([]string{"tar", "-C", in, arg, out}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(out, dagger.ContainerFileOpts{Expand: true})
 }

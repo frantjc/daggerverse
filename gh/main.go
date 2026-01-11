@@ -24,6 +24,7 @@ func New(githubToken *dagger.Secret) *Gh {
 			Packages: []string{"gh"},
 		}).
 		WithEnvVariable("HOME", home).
+		WithWorkdir("$HOME", dagger.ContainerWithWorkdirOpts{Expand: true}).
 		WithSecretVariable("GITHUB_TOKEN", githubToken),
 	}
 }

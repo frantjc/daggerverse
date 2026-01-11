@@ -51,16 +51,20 @@ func (m *Release) Create(
 
 	assets := []*dagger.File{}
 	checksumsTxt := new(strings.Builder)
+	upx := dag.Upx()
+	tar := dag.Tar()
 
 	for _, goos := range []string{"linux", "darwin"} {
 		for _, goarch := range []string{"amd64", "arm64"} {
-			bin := g0.Build(dagger.GoBuildOpts{
-				Pkg:     pkg,
-				Ldflags: "-s -w -X main.version=" + tag,
-				Cgo:     cgo,
-				Goarch:  goarch,
-				Goos:    goos,
-			})
+			bin := upx.Pack(
+				g0.Build(dagger.GoBuildOpts{
+					Pkg:     pkg,
+					Ldflags: "-s -w -X main.version=" + tag,
+					Cgo:     cgo,
+					Goarch:  goarch,
+					Goos:    goos,
+				}),
+			)
 
 			if name == "" {
 				name, err = bin.Name(ctx)
@@ -69,7 +73,19 @@ func (m *Release) Create(
 				}
 			}
 
-			asset := bin.WithName(fmt.Sprintf("%s_%s_%s_%s", name, tag, goos, goarch))
+			asset := tar.
+				Create(
+					module.Filter(dagger.DirectoryFilterOpts{
+						Include: []string{
+							"README.md",
+							"LICENSE",
+						},
+					}).
+						WithFile(
+							fmt.Sprintf("%s-%s-%s-%s.tgz", name, tag, goos, goarch),
+							bin,
+						),
+				)
 			assets = append(assets, asset)
 		}
 	}

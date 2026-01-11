@@ -1,0 +1,14 @@
+{
+  "name": "tar",
+  "engineVersion": "v0.19.9",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "wolfi",
+      "source": "github.com/dagger/dagger/modules/wolfi@v0.19.9",
+      "pin": "42e7b630c9f48f2a9bca26af4f6261b6e54d7374"
+    }
+  ]
+}

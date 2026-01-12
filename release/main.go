@@ -229,7 +229,7 @@ func (m *Release) Create(
 				"api",
 				"-X=PUT",
 				endpoint,
-				"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
+				"-f", fmt.Sprintf("message=chore: bump %s to %s", data.Name, data.Version),
 				"-f", fmt.Sprintf("content=%s", buf.String()),
 		}
 		

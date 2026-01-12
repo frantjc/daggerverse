@@ -37,7 +37,7 @@ func (m *Tar) Create(
 	}
 	exec = append(exec, out, ".")
 	return m.Container.
-		WithDirectory(in, directory, dagger.ContainerWithDirectoryOpts{Expand: true}).
-		WithExec(exec, dagger.ContainerWithExecOpts{Expand: true}).
-		File(out, dagger.ContainerFileOpts{Expand: true})
+		WithDirectory(in, directory).
+		WithExec(exec).
+		File(out)
 }

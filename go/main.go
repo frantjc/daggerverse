@@ -64,7 +64,7 @@ func New(
 			Container(dagger.WolfiContainerOpts{
 				Packages: append([]string{"go-" + majorMinor}, additionalWolfiPackages...),
 			}).
-			WithEnvVariable("GOPATH", "/go", dagger.ContainerWithEnvVariableOpts{Expand: true}).
+			WithEnvVariable("GOPATH", "/go").
 			WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).

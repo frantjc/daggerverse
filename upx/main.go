@@ -44,7 +44,7 @@ func (m *Upx) Pack(
 	}
 	exec = append(exec, in)
 	return m.Container.
-		WithFile(in, executable, dagger.ContainerWithFileOpts{Expand: true}).
-		WithExec(exec, dagger.ContainerWithExecOpts{Expand: true}).
-		File(in, dagger.ContainerFileOpts{Expand: true}), nil
+		WithFile(in, executable).
+		WithExec(exec).
+		File(in), nil
 }

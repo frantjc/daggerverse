@@ -60,14 +60,14 @@ func (m *Release) Create(ctx context.Context,
 
 	if latest {
 		args = append(args, "--latest")
-	}
+	} else {
+		if prerelease {
+			args = append(args, "--prerelease")
+		}
 
-	if prerelease {
-		args = append(args, "--prerelease")
-	}
-
-	if draft {
-		args = append(args, "--draft")
+		if draft {
+			args = append(args, "--draft")
+		}
 	}
 
 	if verifyTag {
@@ -102,15 +102,15 @@ func (m *Release) Edit(ctx context.Context,
 	}
 
 	if latest {
-		args = append(args, "--latest")
-	}
+		args = append(args, "--latest", "--draft=false", "--prerelease=false")
+	} else {
+		if prerelease {
+			args = append(args, "--prerelease")
+		}
 
-	if prerelease {
-		args = append(args, "--prerelease")
-	}
-
-	if draft {
-		args = append(args, "--draft")
+		if draft {
+			args = append(args, "--draft")
+		}
 	}
 
 	if verifyTag {

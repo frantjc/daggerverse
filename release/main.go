@@ -43,7 +43,7 @@ func (m *Release) Create(
 	ctx context.Context,
 	githubToken *dagger.Secret,
 	githubRepo,
-	pkg string,
+	name string,
 	// +optional
 	cgo bool,
 	// +default=[
@@ -63,9 +63,8 @@ func (m *Release) Create(
 	if err != nil {
 		return err
 	}
-
 	data := new(tplData)
-	data.Name = filepath.Base(pkg)
+	data.Name = name
 	data.Homepage = fmt.Sprintf("https://github.com/%s", githubRepo)
 
 	gh := dag.Gh(githubToken)

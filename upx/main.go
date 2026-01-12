@@ -22,17 +22,17 @@ func New() (*Upx, error) {
 
 func (m *Upx) Pack(
 	ctx context.Context,
-	file *dagger.File,
+	executable *dagger.File,
 	// +optional
 	brute,
 	// +optional
 	lzma bool,
 ) (*dagger.File, error) {
-	name, err := file.Name(ctx)
+	name, err := executable.Name(ctx)
 	if err != nil {
 		return nil, err
 	}
-	in := fmt.Sprintf("$HOME/%s", name)
+	in := fmt.Sprintf("%s", name)
 	exec := []string{"upx"}
 	if brute {
 		exec = append(exec, "--brute")
@@ -44,7 +44,7 @@ func (m *Upx) Pack(
 	}
 	exec = append(exec, in)
 	return m.Container.
-		WithFile(in, file, dagger.ContainerWithFileOpts{Expand: true}).
+		WithFile(in, executable, dagger.ContainerWithFileOpts{Expand: true}).
 		WithExec(exec, dagger.ContainerWithExecOpts{Expand: true}).
 		File(in, dagger.ContainerFileOpts{Expand: true}), nil
 }

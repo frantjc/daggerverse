@@ -194,9 +194,18 @@ func (m *Release) Create(
 
 	assets = append(assets, dag.File("checksums.txt", checksumsTxt.String()))
 
-	if err := gh.
-		Release().
-		Create(ctx, data.Version, githubRepo, dagger.GhReleaseCreateOpts{Assets: assets}); err != nil {
+	release := gh.Release(githubRepo, data.Version)
+
+	if err := release.Create(ctx, dagger.GhReleaseCreateOpts{
+		Draft: true,
+		GenerateNotes: true,
+	}); err != nil {
+		return err
+	}
+
+	if err := release.Upload(ctx, assets, dagger.GhReleaseUploadOpts{
+		Clobber: true,
+	}); err != nil {
 		return err
 	}
 
@@ -219,6 +228,7 @@ func (m *Release) Create(
 				"gh",
 				"api",
 				"-X=PUT",
+				endpoint,
 				"-f", fmt.Sprintf(`message="chore: bump %s to %s"`, data.Name, data.Version),
 				"-f", fmt.Sprintf("content=%s", buf.String()),
 		}
@@ -234,13 +244,18 @@ func (m *Release) Create(
 			Stdout(ctx); err == nil {
 			upload = append(upload, "-f", fmt.Sprintf("sha=%s", strings.TrimSpace(sha)))
 		}
-		var _ = []string{"gh", "api", endpoint, "--jq", ".sha"}
 
 		if _, err := gh.Container().
 			WithExec(upload).
 			Sync(ctx); err != nil {
 			return err
 		}
+	}
+
+	if err := release.Edit(ctx, dagger.GhReleaseEditOpts{
+		Latest: true,
+	}); err != nil {
+		return err
 	}
 
 	return nil

@@ -24,44 +24,138 @@ func New(githubToken *dagger.Secret) *Gh {
 type Release struct {
 	// +private
 	Gh *Gh
+	// +private
+	Repo string
+	// +private
+	Tag string
 }
 
-func (m *Gh) Release() *Release {
-	return &Release{Gh: m}
+func (m *Gh) Release(repo, tag string) *Release {
+	return &Release{Gh: m, Repo: repo, Tag: tag}
 }
 
 func (m *Release) Create(ctx context.Context,
-	tag,
-	repo string,
 	// +optional
-	assets []*dagger.File,
+	title string,
+	// +optional
+	generateNotes,
+	// +optional
+	latest,
+	// +optional
+	prerelease,
+	// +optional
+	draft,
+	// +optional
+	verifyTag bool,
 ) error {
-	arg := fmt.Sprintf("-R=%s", repo)
+	args := []string{"create", m.Tag}
 
-	release := m.Gh.Container.
-		WithExec([]string{"gh", "release", arg, "create", tag, "--generate-notes", "--draft"})
+	if title != "" {
+		args = append(args, fmt.Sprintf("--title=%s", title))
+	}
+
+	if generateNotes {
+		args = append(args, "--generate-notes")
+	}
+
+	if latest {
+		args = append(args, "--latest")
+	}
+
+	if prerelease {
+		args = append(args, "--prerelease")
+	}
+
+	if draft {
+		args = append(args, "--draft")
+	}
+
+	if verifyTag {
+		args = append(args, "--verify-tag")
+	}
+
+	return m.run(ctx, nil, args...)
+}
+
+func (m *Release) Edit(ctx context.Context,
+	// +optional
+	title string,
+	// +optional
+	generateNotes,
+	// +optional
+	latest,
+	// +optional
+	prerelease,
+	// +optional
+	draft,
+	// +optional
+	verifyTag bool,
+) error {
+	args := []string{"edit", m.Tag}
+
+	if title != "" {
+		args = append(args, fmt.Sprintf("--title=%s", title))
+	}
+
+	if generateNotes {
+		args = append(args, "--generate-notes")
+	}
+
+	if latest {
+		args = append(args, "--latest")
+	}
+
+	if prerelease {
+		args = append(args, "--prerelease")
+	}
+
+	if draft {
+		args = append(args, "--draft")
+	}
+
+	if verifyTag {
+		args = append(args, "--verify-tag")
+	}
+
+	return m.run(ctx, nil, args...)
+}
+
+func (m *Release) Upload(ctx context.Context,
+	assets []*dagger.File,
+	// +optional
+	clobber bool,
+) error {
+	container := m.Gh.Container
+	args := []string{"upload", m.Tag}
+
+	if clobber {
+		args = append(args, "--clobber")
+	}
 
 	for _, asset := range assets {
-		file, err := asset.Name(ctx)
+		name, err := asset.Name(ctx)
 		if err != nil {
 			return err
 		}
 
-		release = release.
+		container = container.
 			WithFile(
-				file,
+				name,
 				asset,
-			).
-			WithExec([]string{
-				"gh", "release", arg, "upload", tag, file,
-			})
+			)
+
+		args = append(args, name)
 	}
 
-	if _, err := release.
-		WithExec([]string{"gh", "release", arg, "edit", tag, "--latest", "--draft=false"}).
-		Sync(ctx); err != nil {
+	return m.run(ctx, container, args...)
+}
+
+func (m *Release) run(ctx context.Context, container *dagger.Container, args ...string) error {
+	if container == nil {
+		container = m.Gh.Container
+	}
+	if _, err := container.WithExec(append([]string{"gh", "release", fmt.Sprintf("--repo=%s", m.Repo)}, args...)).Sync(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }

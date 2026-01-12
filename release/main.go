@@ -181,10 +181,18 @@ func (m *Release) Create(
 				URL: fmt.Sprintf("%s/releases/download/%s/%s", data.Homepage, data.Version, file),
 				Sha256: strings.TrimPrefix(checksum, "sha256:"),
 			}
+			os := "linux"
+			if gs == "darwin" {
+				os = "macos"
+			}
+			arch := "intel"
+			if ga == "arm64" {
+				arch = "arm"
+			}
 			if _, ok := data.OsArch[gs]; ok {
-				data.OsArch[gs][ga] = osArchData
+				data.OsArch[os][arch] = osArchData
 			} else {
-				data.OsArch[gs] = map[string]tplOsArchData{ga: osArchData}
+				data.OsArch[os] = map[string]tplOsArchData{arch: osArchData}
 			}
 
 			assets = append(assets, asset)

@@ -4,6 +4,10 @@ cask "{{ .Name }}" do
   version "{{ .Version }}"
   binary "{{ .Name }}"
 
+  livecheck do
+    skip "Auto-generated on release."
+  end
+
   {{- range $goos, $archMap := .OsArch }}
   on_{{ $goos }} do
     {{- range $goarch, $osArchData := $archMap }}
@@ -13,8 +17,8 @@ cask "{{ .Name }}" do
     end
     {{- end }}
   end
-  {{- end }}
 
+  {{- end }}
   postflight do
     if OS.mac?
       if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0

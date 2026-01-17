@@ -3,7 +3,7 @@ module github.com/frantjc/daggerverse/dogger/internal/dogger
 go 1.25.2
 
 require (
-	dagger.io/dagger v0.19.9
+	dagger.io/dagger v0.19.10
 	github.com/containerd/log v0.1.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v28.5.1+incompatible

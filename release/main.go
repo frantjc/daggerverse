@@ -159,9 +159,8 @@ func (m *Release) Create(
 						),
 					dagger.TarCreateOpts{
 						Compress: true,
-						Name: file,
 					},
-				)
+				).WithName(file)
 
 			sha256sum, err := wolfi.WithFile(file, asset).WithExec([]string{"sha256sum", file}).Stdout(ctx)
 			if err != nil {

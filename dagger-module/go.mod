@@ -1,4 +1,4 @@
-module github.com/frantjc/daggerverse/toolchains/dagger-module
+module github.com/frantjc/daggerverse/dagger-module
 
 go 1.25.5
 

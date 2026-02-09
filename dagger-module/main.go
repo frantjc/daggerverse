@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagger/dagger/core/modules"
 	"github.com/dagger/dagger/engine"
-	"github.com/frantjc/daggerverse/toolchains/dagger-module/internal/dagger"
+	"github.com/frantjc/daggerverse/dagger-module/internal/dagger"
 )
 
 type DaggerModule struct {

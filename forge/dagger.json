@@ -9,5 +9,6 @@
       "name": "go",
       "source": "../go"
     }
-  ]
+  ],
+  "source": "."
 }

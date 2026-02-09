@@ -52,7 +52,7 @@ func (m *Compose) Up(
 	// +optional
 	services ...string,
 ) (*dagger.Service, error) {
-	tmp, err:= os.MkdirTemp("", "src")
+	tmp, err := os.MkdirTemp("", "src")
 	if err != nil {
 		return nil, err
 	}

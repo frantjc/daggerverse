@@ -21,34 +21,27 @@ type Go struct {
 func New(
 	ctx context.Context,
 	// +optional
-	module *dagger.Directory,
-	// +optional
-	goMod *dagger.File,
+	// +defaultPath="."
+	source *dagger.Directory,
 	// +optional
 	version string,
 	// +optional
 	additionalWolfiPackages []string,
 ) (*Go, error) {
-	if module != nil {
-		goMod = module.File("go.mod")
+	goMod := source.File("go.mod")
+
+	goModContents, err := goMod.Contents(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	if goMod != nil {
-		goModContents, err := goMod.Contents(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
-		if err != nil {
-			return nil, err
-		}
-
-		version = parsedGoMod.Go.Version
+	parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	if version == "" {
-		return nil, fmt.Errorf("one of module, go-mod, or version is required")
+		version = parsedGoMod.Go.Version
 	}
 
 	version = xstrings.EnsurePrefix(version, "v")
@@ -73,31 +66,17 @@ func New(
 			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
 	}
 
-	if module == nil {
+	if source == nil {
 		m.Container = m.Container.WithWorkdir("$GOPATH", dagger.ContainerWithWorkdirOpts{Expand: true})
 		return m, nil
 	}
 
-	return m.WithSource(ctx, module)
-}
-
-func (m *Go) WithSource(ctx context.Context, source *dagger.Directory) (*Go, error) {
-	goModContents, err := source.File("go.mod").Contents(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Go{
-		Container: m.Container.
-			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
-			WithMountedDirectory(".", source).
-			WithExec([]string{"go", "mod", "download"}),
-	}, nil
+	m.Container =  m.Container.
+		WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
+		WithMountedDirectory(".", source).
+		WithExec([]string{"go", "mod", "download"})
+	
+	return m, nil
 }
 
 func (m *Go) Build(
@@ -127,11 +106,11 @@ func (m *Go) Build(
 	}
 
 	return m.Container.
-		With(func(r *dagger.Container) *dagger.Container {
+		With(func(c *dagger.Container) *dagger.Container {
 			if !cgo {
-				return r.WithEnvVariable("CGO_ENABLED", "0")
+				return c.WithEnvVariable("CGO_ENABLED", "0")
 			}
-			return r
+			return c
 		}).
 		With(func(c *dagger.Container) *dagger.Container {
 			if goos != "" {
@@ -144,4 +123,76 @@ func (m *Go) Build(
 		}).
 		WithExec([]string{"go", "build", "-trimpath", "-ldflags="+ldflags, "-o", output, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(output, dagger.ContainerFileOpts{Expand: true}), nil
+}
+
+// +check
+func (m *Go) Test(
+	ctx context.Context,
+	// +optional
+	// +default="./..."
+	pkg string,
+) error {
+	_, err := m.Container.
+		WithExec([]string{"go", "test", "-race", pkg}, dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true}).
+		Sync(ctx)
+	return err
+}
+
+// +generate
+func (m *Go) Fmt(
+	ctx context.Context,
+	// +optional
+	// +default="./..."
+	pkg string,
+) *dagger.Changeset {
+	src := m.Container.
+		Directory(".")
+	return m.Container.
+		WithExec([]string{"go", "fmt", pkg}).
+		Directory(".").
+		Changes(src)
+}
+
+// +check
+func (m *Go) Vulncheck(
+	ctx context.Context,
+	// +optional
+	// +default="latest"
+	version string,
+) error {
+	_, err := m.Container.
+		WithExec([]string{"go", "install", fmt.Sprintf("golang.org/x/vuln/cmd/govulncheck@%s", version)}).
+		WithExec([]string{"govulncheck", "./..."}).
+		Sync(ctx)
+	return err
+}
+
+// +check
+func (m *Go) Vet(ctx context.Context) error {
+	_, err := m.Container.
+		WithExec([]string{"go", "vet", "./..."}).
+		Sync(ctx)
+	return err
+}
+
+// +check
+func (m *Go) Staticcheck(
+	ctx context.Context,
+	// +optional
+	// +default="latest"
+	version string,
+) error {
+	_, err := m.Container.
+		WithExec([]string{"go", "install", fmt.Sprintf("honnef.co/go/tools/cmd/staticcheck@%s", version)}).
+		WithExec([]string{"staticcheck", "./..."}).
+		Sync(ctx)
+	return err
+}
+
+// +generate
+func (m *Go) Tidy(ctx context.Context) *dagger.Changeset {
+	return m.Container.
+		WithExec([]string{"go", "mod", "tidy"}).
+		Directory(".").
+		Changes(m.Container.Directory("."))
 }

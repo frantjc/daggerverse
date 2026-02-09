@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/frantjc/daggerverse/tar/internal/dagger"
 )
 
 type Tar struct {
+	// +private
 	Container *dagger.Container
 }
 
@@ -15,13 +19,18 @@ func New() (*Tar, error) {
 }
 
 func (m *Tar) Create(
+	ctx context.Context,
 	directory *dagger.Directory,
 	// +optional
 	compress bool,
-) *dagger.File {
-	in := "/in"
+) (*dagger.File, error) {
+	name, err := directory.Name(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in := fmt.Sprintf("/%s", name)
 	exec := []string{"tar", "-C", in}
-	out := "/out.tar"
+	out := fmt.Sprintf("/%s.tar", name)
 	if compress {
 		out += ".gz"
 		exec = append(exec, "-czf")
@@ -32,5 +41,5 @@ func (m *Tar) Create(
 	return m.Container.
 		WithDirectory(in, directory).
 		WithExec(exec).
-		File(out)
+		File(out), nil
 }

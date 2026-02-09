@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/frantjc/daggerverse/upx/internal/dagger"
 )
@@ -32,7 +31,6 @@ func (m *Upx) Pack(
 	if err != nil {
 		return nil, err
 	}
-	in := fmt.Sprintf("%s", name)
 	exec := []string{"upx"}
 	if brute {
 		exec = append(exec, "--brute")
@@ -42,9 +40,9 @@ func (m *Upx) Pack(
 	} else {
 		exec = append(exec, "--no-lzma")
 	}
-	exec = append(exec, in)
+	exec = append(exec, name)
 	return m.Container.
-		WithFile(in, executable).
+		WithFile(name, executable).
 		WithExec(exec).
-		File(in), nil
+		File(name), nil
 }

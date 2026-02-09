@@ -10,6 +10,7 @@ type DaggerverseDev struct {
 }
 
 func New(
+	// +optional
 	// +defaultPath="."
 	source *dagger.Directory,
 ) *DaggerverseDev {
@@ -20,7 +21,7 @@ func New(
 
 // +generate
 func (m *DaggerverseDev) Bump(ctx context.Context) *dagger.Changeset {
-	src := m.Source
+	cs := dag.Directory().Changes(dag.Directory())
 
 	for _, daggerModulePath := range []string{
 		"compose",
@@ -33,15 +34,15 @@ func (m *DaggerverseDev) Bump(ctx context.Context) *dagger.Changeset {
 		"tar",
 		"tls",
 		"upx",
-		".",
 	} {
-		src = src.WithChanges(
-			dag.DaggerModule(m.Source, dagger.DaggerModuleOpts{
+		cs = cs.WithChangeset(
+			dag.DaggerModule(dagger.DaggerModuleOpts{
+				Source: m.Source,
 				Path: daggerModulePath,
 			}).
 				Bump(),
 		)
 	}
 	
-	return src.Changes(m.Source)
+	return cs
 }

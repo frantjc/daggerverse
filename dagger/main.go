@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"dagger/dagger/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/frantjc/daggerverse/dagger/internal/dagger"
 )
 
 type Dagger struct{}
@@ -47,25 +48,25 @@ func (m *Dagger) Binary(ctx context.Context) (*dagger.File, error) {
 		File(tmpDaggerPath), nil
 }
 
-func (m *Dagger) Container(
-	ctx context.Context,
-	// +default="/usr/local/bin/dagger"
-	path string,
-	// +optional
-	container *dagger.Container,
-	// +optional
-	opts dagger.ContainerWithFileOpts,
-) (*dagger.Container, error) {
-	if container == nil {
-		container = dag.Wolfi().Container()
-	}
+// func (m *Dagger) Container(
+// 	ctx context.Context,
+// 	// +default="/usr/local/bin/dagger"
+// 	path string,
+// 	// +optional
+// 	container *dagger.Container,
+// 	// +optional
+// 	opts dagger.ContainerWithFileOpts,
+// ) (*dagger.Container, error) {
+// 	if container == nil {
+// 		container = dag.Wolfi().Container()
+// 	}
 
-	binary, err := m.Binary(ctx)
-	if err != nil {
-		return nil, err
-	}
+// 	binary, err := m.Binary(ctx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return container.
-		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", path).
-		WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", binary, dagger.ContainerWithFileOpts{Expand: true}, opts), nil
-}
+// 	return container.
+// 		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", path).
+// 		WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", binary, dagger.ContainerWithFileOpts{Expand: true}, opts), nil
+// }

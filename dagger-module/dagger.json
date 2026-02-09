@@ -1,21 +1,17 @@
 {
-  "name": "release",
+  "name": "dagger-module",
   "engineVersion": "v0.19.11",
   "sdk": {
     "source": "go"
   },
   "dependencies": [
     {
-      "name": "gh",
-      "source": "../gh"
+      "name": "dagger",
+      "source": "../dagger"
     },
     {
-      "name": "tar",
-      "source": "../tar"
-    },
-    {
-      "name": "upx",
-      "source": "../upx"
+      "name": "go",
+      "source": "../go"
     },
     {
       "name": "wolfi",

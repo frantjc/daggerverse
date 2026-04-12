@@ -1,10 +1,14 @@
 {
-  "name": "gh",
+  "name": "godot",
   "engineVersion": "v0.20.3",
   "sdk": {
     "source": "go"
   },
   "dependencies": [
+    {
+      "name": "osslsigncode",
+      "source": "../osslsigncode"
+    },
     {
       "name": "wolfi",
       "source": "github.com/dagger/dagger/modules/wolfi@v0.20.3",

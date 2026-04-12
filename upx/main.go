@@ -30,6 +30,8 @@ func (m *Upx) Pack(
 	name, err := executable.Name(ctx)
 	if err != nil {
 		return nil, err
+	} else if name == "" {
+		name = "input"
 	}
 	exec := []string{"upx"}
 	if brute {

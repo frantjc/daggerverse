@@ -54,12 +54,12 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 				for {
 					e, err := logEventSource.Next()
 					if err != nil {
-						if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+						if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) || errors.Is(err, sse.ErrSourceClosed) {
 							return
 						}
 						log.Error(err.Error())
 						continue
-					} else if e.Name == "attached" {
+					} else if e.Name == "attached" || e.Name == "" {
 						continue
 					}
 
@@ -69,7 +69,9 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 						continue
 					}
 
-					l(ctx, &req)
+					if err := l(ctx, &req); err != nil {
+						log.Error(err.Error())
+					}
 				}
 			}()
 		}
@@ -92,12 +94,12 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 			for {
 				e, err := traceEventSource.Next()
 					if err != nil {
-						if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+						if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) || errors.Is(err, sse.ErrSourceClosed) {
 							return
 						}
 						log.Error(err.Error())
 						continue
-					} else if e.Name == "attached" {
+					} else if e.Name == "attached" || e.Name == "" {
 						continue
 					}
 
@@ -107,7 +109,9 @@ func Connect(ctx context.Context, l LogCallback, t TraceCallback) (*dagger.Clien
 					continue
 				}
 
-				t(ctx, &req)
+				if err := t(ctx, &req); err != nil {
+					log.Error(err.Error())
+				}
 			}
 		}()
 

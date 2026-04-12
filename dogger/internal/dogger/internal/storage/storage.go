@@ -11,6 +11,7 @@ import (
 type Container struct {
 	ID         string
 	SpanID     string
+	ServiceID  string
 	Created    time.Time
 	Config     containertypes.Config
 	HostConfig containertypes.HostConfig

@@ -1,5 +1,5 @@
 {
-  "name": "gh",
+  "name": "archive",
   "engineVersion": "v0.20.3",
   "sdk": {
     "source": "go"

@@ -71,42 +71,75 @@ func (m *DaggerModule) Bump(ctx context.Context) (*dagger.Changeset, error) {
 			dag.File(modules.Filename, string(updatedDaggerJSON)+"\n"),
 		)
 
-	for _, dependency := range moduleConfig.Dependencies {
+	wd, err := m.Container.Workdir(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dependency := range append(moduleConfig.Toolchains, moduleConfig.Dependencies...) {
+		if !strings.Contains(dependency.Source, "@") && !strings.HasPrefix(dependency.Source, "..") {
+			nwd := filepath.Join(wd, dependency.Source)
+			n := &DaggerModule{Container: container.WithWorkdir(nwd)}
+
+			if _, err := n.Bump(ctx); err != nil {
+				return nil, err
+			}
+
+			container = n.Container.WithWorkdir(wd)
+		}
+
 		if strings.HasPrefix(dependency.Source, "github.com/dagger/dagger") {
 			module, _, _ := strings.Cut(dependency.Source, "@")
-			container = container.WithExec(
-				[]string{"dagger", "update", fmt.Sprintf("%s@%s", module, version)},
-				dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
-			)
+			container = container.
+				WithExec(
+					[]string{"dagger", "update", fmt.Sprintf("%s@%s", module, version)},
+					dagger.ContainerWithExecOpts{
+						ExperimentalPrivilegedNesting: true,
+					},
+				)
 		}
 	}
 
 	if isGo(moduleConfig) {
-		workdir, err := container.Workdir(ctx)
-		if err != nil {
+		goModulePath := filepath.Join(wd, moduleConfig.Source)
+
+		if exists, err := container.Exists(ctx, goModulePath); err != nil {
 			return nil, err
-		}
-
-		goModulePath := filepath.Join(workdir, moduleConfig.Source)
-
-		container = container.WithDirectory(
-			goModulePath,
-			container.Directory(goModulePath).
-				WithChanges(
-					dag.Go(dagger.GoOpts{
-							Source: container.
-								WithExec(
-									[]string{"dagger", "develop"},
-									dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true},
-								).
-								Directory(goModulePath),
+		} else if exists {
+			daggerDeveloped := container.
+				WithExec(
+					[]string{"dagger", "develop"},
+					dagger.ContainerWithExecOpts{
+						ExperimentalPrivilegedNesting: true,
+					},
+				).
+				Directory(goModulePath)
+			daggerGoModuleBumped := dag.Go(dagger.GoOpts{
+				Source: daggerDeveloped,
+			}).
+				Container().
+				WithExec([]string{"go", "get", "-u", fmt.Sprintf("dagger.io/dagger@%s", version)}).
+				WithExec([]string{"go", "get", "-u", fmt.Sprintf("github.com/dagger/dagger@%s", version)}).
+				Directory(".")
+			container = container.WithDirectory(
+				goModulePath,
+				container.
+					Directory(goModulePath).
+					WithChanges(
+						dag.Go(dagger.GoOpts{
+							Source: daggerGoModuleBumped,
 						}).
 							Tidy(),
-				),
-		)
+					),
+			)
+		}
 	}
 
-	return container.
+	cs := container.
 		Directory("/src").
-		Changes(m.Container.Directory("/src")), nil
+		Changes(m.Container.Directory("/src"))
+	
+	m.Container = container
+
+	return cs, nil
 }

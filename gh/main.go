@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/frantjc/daggerverse/gh/internal/dagger"
+	"github.com/logsquaredn/rubber/.dagger/modules/gh/internal/dagger"
 )
 
 type Gh struct {
@@ -14,10 +14,10 @@ type Gh struct {
 func New(githubToken *dagger.Secret) *Gh {
 	return &Gh{
 		Container: dag.Wolfi().
-		Container(dagger.WolfiContainerOpts{
-			Packages: []string{"gh"},
-		}).
-		WithSecretVariable("GITHUB_TOKEN", githubToken),
+			Container(dagger.WolfiContainerOpts{
+				Packages: []string{"gh"},
+			}).
+			WithSecretVariable("GITHUB_TOKEN", githubToken),
 	}
 }
 
@@ -34,7 +34,8 @@ func (m *Gh) Release(repo, tag string) *Release {
 	return &Release{Gh: m, Repo: repo, Tag: tag}
 }
 
-func (m *Release) Create(ctx context.Context,
+func (m *Release) Create(
+	ctx context.Context,
 	// +optional
 	title string,
 	// +optional
@@ -77,7 +78,8 @@ func (m *Release) Create(ctx context.Context,
 	return m.run(ctx, nil, args...)
 }
 
-func (m *Release) Edit(ctx context.Context,
+func (m *Release) Edit(
+	ctx context.Context,
 	// +optional
 	title string,
 	// +optional
@@ -120,7 +122,8 @@ func (m *Release) Edit(ctx context.Context,
 	return m.run(ctx, nil, args...)
 }
 
-func (m *Release) Upload(ctx context.Context,
+func (m *Release) Upload(
+	ctx context.Context,
 	assets []*dagger.File,
 	// +optional
 	clobber bool,
@@ -157,5 +160,107 @@ func (m *Release) run(ctx context.Context, container *dagger.Container, args ...
 	if _, err := container.WithExec(append([]string{"gh", "release", fmt.Sprintf("--repo=%s", m.Repo)}, args...)).Sync(ctx); err != nil {
 		return err
 	}
+	return nil
+}
+
+const (
+	workDir = "/tmp"
+	bodyPath = workDir + "/body"
+)
+
+func (m *Gh) SetSecret(
+	ctx context.Context,
+	name string,
+	body *dagger.Secret,
+	// +optional
+	app,
+	// +optional
+	env,
+	// +optional
+	org,
+	// +optional
+	visibility string,
+	// +optional
+	user,
+	// +optional
+	noReposSelected bool,
+	// +optional
+	repo []string,
+) error {
+	return m.set(ctx, "secret", name, body, app, env, org, visibility, user, noReposSelected, repo)
+}
+
+func (m *Gh) SetVariable(
+	ctx context.Context,
+	name string,
+	body *dagger.Secret,
+	// +optional
+	env,
+	// +optional
+	org,
+	// +optional
+	visibility string,
+	// +optional
+	repo []string,
+) error {
+	return m.set(ctx, "variable", name, body, "", env, org, visibility, false, false, repo)
+}
+
+func (m *Gh) set(
+	ctx context.Context,
+	kind,
+	name string,
+	body *dagger.Secret,
+	app,
+	env,
+	org,
+	visibility string,
+	user,
+	noReposSelected bool,
+	repo []string,
+) error {
+	args := []string{"gh", kind, "set", name}
+
+	if app != "" {
+		args = append(args, "--app", app)
+	}
+
+	if env != "" {
+		args = append(args, "--env", env)
+	}
+
+	if org != "" {
+		args = append(args, "--org", org)
+	}
+
+	if lenRepo := len(repo); lenRepo == 1 {
+		args = append(args, "--repo", repo[0])
+	} else if lenRepo > 0 {
+		for _, r := range repo {
+			args = append(args, "--repos", r)
+		}
+	}
+
+	if noReposSelected {
+		args = append(args, "--no-repos-selected")
+	}
+
+	if user {
+		args = append(args, "--user")
+	}
+
+	if visibility != "" {
+		args = append(args, "--visibility", visibility)
+	}
+
+	if _, err := m.Container.
+		WithMountedSecret(bodyPath, body).
+		WithExec(args, dagger.ContainerWithExecOpts{
+			RedirectStdin: bodyPath,
+		}).
+		Sync(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }

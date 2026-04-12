@@ -474,7 +474,7 @@ func withShim(ctx context.Context, container *dagger.Container) (*dagger.Contain
 	src := dag.CurrentModule().Source()
 
 	shim := dag.Go(dagger.GoOpts{
-		Module: src,
+		Source: src,
 		AdditionalWolfiPackages: []string{"gcc"},
 	}).
 		Build(dagger.GoBuildOpts{

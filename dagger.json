@@ -1,13 +1,69 @@
 {
   "name": "daggerverse-dev",
-  "engineVersion": "v0.19.11",
+  "engineVersion": "v0.20.3",
   "sdk": {
     "source": "go"
   },
-  "dependencies": [
+  "toolchains": [
     {
       "name": "dagger-module",
-      "source": "dagger-module"
+      "source": "dagger-module",
+      "customizations": [
+        {
+          "argument": "source",
+          "defaultPath": "."
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "archive",
+      "source": "archive"
+    },
+    {
+      "name": "compose",
+      "source": "compose"
+    },
+    {
+      "name": "dagger",
+      "source": "dagger"
+    },
+    {
+      "name": "dogger",
+      "source": "dogger"
+    },
+    {
+      "name": "forge",
+      "source": "forge"
+    },
+    {
+      "name": "gh",
+      "source": "gh"
+    },
+    {
+      "name": "go",
+      "source": "go"
+    },
+    {
+      "name": "godot",
+      "source": "godot"
+    },
+    {
+      "name": "osslsigncode",
+      "source": "osslsigncode"
+    },
+    {
+      "name": "pki",
+      "source": "pki"
+    },
+    {
+      "name": "release",
+      "source": "release"
+    },
+    {
+      "name": "upx",
+      "source": "upx"
     }
   ],
   "source": ".dagger"

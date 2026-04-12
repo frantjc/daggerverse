@@ -196,3 +196,17 @@ func (m *Go) Tidy(ctx context.Context) *dagger.Changeset {
 		Directory(".").
 		Changes(m.Container.Directory("."))
 }
+
+func (m *Go) UpgradeDirect(ctx context.Context) *dagger.Changeset {
+	return m.Container.
+		WithExec([]string{"go", "get", "-u", "./..."}).
+		Directory(".").
+		Changes(m.Container.Directory("."))
+}
+
+func (m *Go) UpgradeTransitive(ctx context.Context) *dagger.Changeset {
+	return m.Container.
+		WithExec([]string{"go", "get", "-ut", "./..."}).
+		Directory(".").
+		Changes(m.Container.Directory("."))
+}

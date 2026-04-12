@@ -1,6 +1,6 @@
 {
   "name": "compose",
-  "engineVersion": "v0.19.11",
+  "engineVersion": "v0.20.3",
   "sdk": {
     "source": "go"
   },

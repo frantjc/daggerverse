@@ -3,9 +3,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/frantjc/daggerverse/dogger/internal/dagger"
+	"github.com/google/uuid"
 )
 
 type Dogger struct {
@@ -64,12 +66,33 @@ func (m *Dogger) BoundTo(
 			}
 
 			return c
-		}).
+		})
+}
+
+func (m *Dogger) Playground() *dagger.Container {
+	return m.
+		BoundTo(dag.Container().From("docker.io/library/docker:cli"), "dogger", false).
 		Terminal(dagger.ContainerTerminalOpts{
 			ExperimentalPrivilegedNesting: true,
 		})
 }
 
-func (m *Dogger) Playground() *dagger.Container {
-	return m.BoundTo(dag.Container().From("docker.io/library/docker:cli"), "dogger", false)
+// +check
+func (m *Dogger) TestStdout(ctx context.Context) error {
+	expected := uuid.NewString()
+
+	actual, err := m.BoundTo(
+		dag.Container().From("alpine"),
+		"dogger",
+		true,
+	).
+		WithExec([]string{"docker", "run", "busybox", "echo", expected}).
+		Stdout(ctx)
+	if err != nil {
+		return err
+	} else if expected != actual {
+		return fmt.Errorf("expected %s, got %s", expected, actual)
+	}
+
+	return nil
 }

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"dagger.io/dagger"
@@ -40,10 +42,15 @@ type ContainerBackend struct {
 	// Storage is where data about the containers gets kept.
 	Storage storage.ContainerStore
 
-	spanTree spanTree
+	spanTree   spanTree
 	logRecords []log.Record
 	// TODO(frantjc): Use this to both remember log records and stream them to clients who currently want them.
 	logExporters logExporters
+	// containerDone tracks channels that get closed when a container completes.
+	// Multiple goroutines can wait on the same channel.
+	containerDone sync.Map // map[string]chan struct{}
+	// waitStatus tracks the exit status of completed containers
+	waitStatus sync.Map // map[string]containertypes.StateStatus
 }
 
 type logExporters map[string]log.Exporter
@@ -70,12 +77,16 @@ func (e logExporters) ForceFlush(ctx context.Context) (err error) {
 type writerLogExporter struct {
 	io.Writer
 	lineage map[string]struct{}
+	muxed   bool
+	log     *slog.Logger
 }
 
 func (e *writerLogExporter) Export(ctx context.Context, records []log.Record) error {
 	for _, record := range records {
 		if _, ok := e.lineage[record.SpanID().String()]; ok {
-			if _, err := e.Writer.Write([]byte(record.Body().String())); err != nil {
+			body := record.Body().String()
+			e.log.Info("exporting log", "body", body, "len", len(body))
+			if _, err := e.Writer.Write([]byte(body)); err != nil {
 				return err
 			}
 		}
@@ -119,12 +130,15 @@ func (c *ContainerBackend) exportLogs(ctx context.Context, req *collogspb.Export
 type spanTree map[string][]string
 
 func (s spanTree) Add(span trace.ReadOnlySpan) {
-	parentSpanID := span.SpanContext().SpanID().String()
+	parentSpanID := span.Parent().SpanID().String()
 	spanID := span.SpanContext().SpanID().String()
 	if childSpanIDs, ok := s[parentSpanID]; !ok {
 		s[parentSpanID] = []string{spanID}
 	} else {
 		s[parentSpanID] = append(childSpanIDs, spanID)
+	}
+	// Initialize entry for this span even if it has no children yet
+	if _, ok := s[spanID]; !ok {
 		s[spanID] = []string{}
 	}
 }
@@ -136,15 +150,14 @@ func (s spanTree) Lineage(spanID string) map[string]struct{} {
 
 func (s spanTree) lineage(spanID string, lineage map[string]struct{}) map[string]struct{} {
 	lineage[spanID] = struct{}{}
-	for {
-		childSpanIDs, ok := s[spanID]
-		if !ok {
-			return lineage
-		}
-		for _, childSpanID := range childSpanIDs {
-			s.lineage(childSpanID, lineage)
-		}
+	childSpanIDs, ok := s[spanID]
+	if !ok {
+		return lineage
 	}
+	for _, childSpanID := range childSpanIDs {
+		s.lineage(childSpanID, lineage)
+	}
+	return lineage
 }
 
 func (c *ContainerBackend) exportTraces(ctx context.Context, req *coltracepb.ExportTraceServiceRequest) error {
@@ -171,54 +184,106 @@ func (c *ContainerBackend) ContainerAttach(name string, cfg *backend.ContainerAt
 
 	log := logutil.SloggerFrom(ctx)
 
-	log.Info("ATTACH")
+	log.Info("ATTACH", "stream", cfg.Stream, "logs", cfg.Logs, "useStdout", cfg.UseStdout, "useStderr", cfg.UseStderr)
 
 	stdin, stdout, stderr, err := cfg.GetStreams(cfg.MuxStreams, cancel)
+	if err != nil {
+		log.Error("GetStreams failed", "error", err)
+		return err
+	}
+
+	log.Info("ATTACHED", "gotStdin", stdin != nil, "gotStdout", stdout != nil, "gotStderr", stderr != nil)
+
+	var (
+		_ = stdin
+		_ = stderr
+	)
+
+	log.Info("attach complete, docker client should now proceed to call start")
+
+	// Get container data
+	data, err := c.Storage.GetContainer(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	log.Info("ATTACHED")
-	fmt.Fprint(stdout, "ATTACHED")
-	fmt.Fprint(stderr, "ATTACHED")
+	// Set up log exporter immediately with an empty lineage
+	// We'll update it once the container starts and we have a span ID
+	k := uuid.NewString()
+	if c.logExporters == nil {
+		c.logExporters = make(logExporters)
+	}
+	logExporter := &writerLogExporter{
+		Writer:  stdout,
+		lineage: make(map[string]struct{}),
+		muxed:   cfg.MuxStreams,
+		log:     log,
+	}
+	c.logExporters[k] = logExporter
+	defer delete(c.logExporters, k)
 
-	var (
-		_ = stdin
-		_ = stdout
-		_ = stderr
-	)
+	log.Info("exporter set up, starting background tasks")
 
-	for {
-		data, err := c.Storage.GetContainer(ctx, name)
-		if err != nil {
-			return err
+	// Start a goroutine to update the lineage once we have a span ID
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info("span ID updater: context done")
+				return
+			case <-ticker.C:
+				data, err := c.Storage.GetContainer(ctx, name)
+				if err != nil {
+					continue
+				}
+
+				if data.SpanID != "" {
+					log.Info("got span ID, updating lineage", "spanID", data.SpanID)
+					lineage := c.spanTree.Lineage(data.SpanID)
+					logExporter.lineage = lineage
+					log.Info("lineage updated", "count", len(lineage))
+					// Export any logs that were buffered before we had the lineage
+					if err := logExporter.Export(ctx, c.logRecords); err != nil {
+						log.Error("failed to export buffered logs", "error", err)
+					}
+					log.Info("span ID updater: done, exiting")
+					return
+				}
+			}
 		}
+	}()
 
-		log.Info("got data")
+	log.Info("blocking to keep attach connection open...")
 
-		if data.SpanID == "" {
-			continue
+	// Keep the attach connection open until the container completes or client disconnects
+	// This is crucial for Docker client compatibility - attach must block
+	if doneChanVal, ok := c.containerDone.Load(data.ID); ok {
+		doneChan := doneChanVal.(chan struct{})
+		log.Info("waiting on container done channel")
+		select {
+		case <-doneChan:
+			log.Info("container finished, flushing logs")
+			// Give a brief moment for any remaining logs to be exported
+			time.Sleep(100 * time.Millisecond)
+			// Force flush any remaining logs
+			if err := logExporter.ForceFlush(ctx); err != nil {
+				log.Error("failed to flush logs", "error", err)
+			}
+			log.Info("flushed logs, attach handler returning")
+		case <-ctx.Done():
+			log.Info("client disconnected from attach")
+			return ctx.Err()
 		}
-
-		log.Info("got span ID")
-
-		lineage := c.spanTree.Lineage(data.SpanID)
-
-		k := uuid.NewString()
-		if c.logExporters == nil {
-			c.logExporters = make(logExporters)
-		}
-		logExporter := &writerLogExporter{Writer: stdout, lineage: lineage}
-		if err := logExporter.Export(ctx, c.logRecords); err != nil {
-			return err
-		}
-		c.logExporters[k] = logExporter
-		defer delete(c.logExporters, k)
-		break
+	} else {
+		// No done channel means it's a long-running service, wait for context cancellation
+		log.Info("no done channel, waiting for context cancellation")
+		<-ctx.Done()
 	}
 
-	<-ctx.Done()
-
+	log.Info("attach handler returning")
 	return nil
 }
 
@@ -268,6 +333,13 @@ func (c *ContainerBackend) ContainerCreate(ctx context.Context, config backend.C
 	if err := c.Storage.NameContainer(ctx, id, config.Name); err != nil {
 		return containertypes.CreateResponse{}, err
 	}
+
+	// Create a done channel for this container now, before Start is called
+	// This handles the case where Wait is called before Start
+	doneChan := make(chan struct{})
+	c.containerDone.Store(id, doneChan)
+	log := logutil.SloggerFrom(ctx)
+	log.Info("ContainerCreate: stored done channel", "id", id, "backend", fmt.Sprintf("%p", c))
 
 	return containertypes.CreateResponse{ID: id, Warnings: warnings}, nil
 }
@@ -329,7 +401,25 @@ func (c *ContainerBackend) ContainerInspect(ctx context.Context, name string, op
 
 // ContainerKill implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerKill(name string, signal string) error {
-	return ErrUnimplemented
+	ctx := c.Context
+
+	data, err := c.Storage.GetContainer(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	dag, err := dagutil.Connect(ctx, c.exportLogs, c.exportTraces)
+	if err != nil {
+		return err
+	}
+
+	if _, err = dag.LoadServiceFromID(dagger.ServiceID(data.ServiceID)).Stop(ctx, dagger.ServiceStopOpts{
+		Kill: true,
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ContainerLogs implements containerrouter.Backend.
@@ -364,6 +454,9 @@ func (c *ContainerBackend) ContainerRm(name string, config *backend.ContainerRmC
 
 // ContainerStart implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, checkpoint string, checkpointDir string) error {
+	log := logutil.SloggerFrom(ctx)
+	log.Info("START", "container", name)
+
 	data, err := c.Storage.GetContainer(ctx, name)
 	if err != nil {
 		return err
@@ -373,6 +466,7 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 	defer span.End()
 
 	data.SpanID = span.SpanContext().SpanID().String()
+	log.Info("START: created span", "spanID", data.SpanID)
 
 	dag, err := dagutil.Connect(ctx, c.exportLogs, c.exportTraces)
 	if err != nil {
@@ -387,6 +481,8 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 		Container(getContainerOpts(platform)...).
 		From(config.Image)
 
+	log.Info("START: built container from image", "image", config.Image)
+
 	for exposedPort := range config.ExposedPorts {
 		container = container.WithExposedPort(exposedPort.Int(), dagger.ContainerWithExposedPortOpts{
 			Protocol: dagger.NetworkProtocol(exposedPort.Proto()),
@@ -398,10 +494,10 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 	// container.AsService errors if there are no ports exposed, so we pick a random
 	// ephemeral port. Ref: https://en.wikipedia.org/wiki/Ephemeral_port#Range.
 	if len(config.ExposedPorts) == 0 {
-		maxRandPort := 60999
 		minRandPort := 32768
+		maxRandPort := 60999
 		randPortRangeSize := maxRandPort - minRandPort
-		randPort := rand.IntN(minRandPort) + randPortRangeSize
+		randPort := minRandPort + rand.IntN(randPortRangeSize)
 		container = container.WithExposedPort(randPort, dagger.ContainerWithExposedPortOpts{
 			ExperimentalSkipHealthcheck: true,
 		})
@@ -423,37 +519,81 @@ func (c *ContainerBackend) ContainerStart(ctx context.Context, name string, chec
 		container = container.WithAnnotation(k, v)
 	}
 
-	svc := container.
-		AsService(dagger.ContainerAsServiceOpts{
-			UseEntrypoint:                 len(config.Entrypoint) == 0,
-			Args:                          append(config.Entrypoint, config.Cmd...),
+	// Set up entrypoint and command
+	if len(config.Entrypoint) > 0 {
+		container = container.WithEntrypoint(config.Entrypoint)
+	}
+
+	// Determine if this is a one-off command or a service.
+	// For one-off commands (has Cmd), execute through a service and track completion.
+	// For long-running containers, use a started service.
+	hasCommand := len(config.Cmd) > 0 || len(config.Entrypoint) > 0
+
+	if hasCommand {
+		svc := container.AsService(dagger.ContainerAsServiceOpts{
+			UseEntrypoint:                 true,
+			Args:                          config.Cmd,
 			ExperimentalPrivilegedNesting: true,
 			InsecureRootCapabilities:      hostConfig.Privileged,
 		})
 
-	if config.Hostname != "" {
-		svc, err = svc.
-			WithHostname(config.Hostname).
-			Start(ctx)
-		if err != nil {
-			return err
+		// Get the done channel that was created during ContainerCreate
+		doneChanVal, ok := c.containerDone.Load(data.ID)
+		if !ok {
+			// Fallback: create it now if it doesn't exist (shouldn't happen in normal flow)
+			doneChan := make(chan struct{})
+			c.containerDone.Store(data.ID, doneChan)
+			doneChanVal = doneChan
 		}
-	} else {
-		svc, err = svc.Start(ctx)
-		if err != nil {
-			return err
-		}
+		doneChan := doneChanVal.(chan struct{})
 
-		config.Hostname, err = svc.Endpoint(ctx)
-		if err != nil {
-			return err
+		// Execute the service in a goroutine and signal completion
+		go func() {
+			defer close(doneChan)
+
+			_, execErr := svc.Sync(ctx)
+			exitCode := 0
+			if execErr != nil {
+				exitCode = 1
+			}
+
+			status := containertypes.NewStateStatus(exitCode, nil)
+			c.waitStatus.Store(data.ID, status)
+		}()
+	} else {
+		// Service mode - use AsService for long-running containers
+		svc := container.
+			AsService(dagger.ContainerAsServiceOpts{
+				UseEntrypoint:                 len(config.Entrypoint) == 0,
+				Args:                          append(config.Entrypoint, config.Cmd...),
+				ExperimentalPrivilegedNesting: true,
+				InsecureRootCapabilities:      hostConfig.Privileged,
+			})
+
+		if config.Hostname != "" {
+			svc, err = svc.
+				WithHostname(config.Hostname).
+				Start(ctx)
+			if err != nil {
+				return err
+			}
+		} else {
+			svc, err = svc.Start(ctx)
+			if err != nil {
+				return err
+			}
+
+			config.Hostname, err = svc.Endpoint(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if err = c.Storage.UpdateContainer(ctx, name, data); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -490,10 +630,51 @@ func (c *ContainerBackend) ContainerUpdate(name string, hostConfig *containertyp
 // ContainerWait implements containerrouter.Backend.
 func (c *ContainerBackend) ContainerWait(ctx context.Context, name string, condition containertypes.WaitCondition) (<-chan containertypes.StateStatus, error) {
 	log := logutil.SloggerFrom(ctx)
-	log.Info("WAIT")
-	// TODO(frantjc).
-	statuses := make(chan containertypes.StateStatus)
-	return statuses, nil
+	data, err := c.Storage.GetContainer(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("WAIT", "container", name, "containerID", data.ID, "condition", condition)
+
+	statusChan := make(chan containertypes.StateStatus, 1)
+
+	// Check if container is already completed
+	if statusVal, ok := c.waitStatus.Load(data.ID); ok {
+		log.Info("WAIT: container already completed")
+		statusChan <- statusVal.(containertypes.StateStatus)
+		close(statusChan)
+		return statusChan, nil
+	}
+
+	// Check if we have a done channel for this container
+	log.Info("WAIT: checking for done channel", "id", data.ID, "backend", fmt.Sprintf("%p", c))
+	if doneChanVal, ok := c.containerDone.Load(data.ID); ok {
+		doneChan := doneChanVal.(chan struct{})
+		log.Info("WAIT: waiting on done channel")
+		go func() {
+			defer close(statusChan)
+			<-doneChan
+			log.Info("WAIT: done channel closed")
+			// Container finished, get the status
+			if statusVal, ok := c.waitStatus.Load(data.ID); ok {
+				log.Info("WAIT: sending status", "exitCode", statusVal.(containertypes.StateStatus).ExitCode)
+				statusChan <- statusVal.(containertypes.StateStatus)
+			} else {
+				// Default to success if no status recorded
+				log.Info("WAIT: no status recorded, defaulting to success")
+				statusChan <- containertypes.NewStateStatus(0, nil)
+			}
+		}()
+		return statusChan, nil
+	}
+
+	// If no done channel exists, this might be a service or already-completed container
+	// Return a channel that immediately indicates success
+	log.Info("WAIT: no done channel, returning immediate success")
+	statusChan <- containertypes.NewStateStatus(0, nil)
+	close(statusChan)
+	return statusChan, nil
 }
 
 // Containers implements containerrouter.Backend.

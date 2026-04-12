@@ -23,7 +23,7 @@ func New(
 
 func (m *DoggerDev) Binary(ctx context.Context) *dagger.File {
 	return dag.Go(dagger.GoOpts{
-		Module: m.Source,
+		Source: m.Source,
 		AdditionalWolfiPackages: []string{"gcc"},
 	}).
 		Build(dagger.GoBuildOpts{

@@ -36,7 +36,7 @@ func NewDogger(version string) *cobra.Command {
 						telemetry.InitEmbedded(cmd.Context(), nil),
 						slog.New(slog.NewJSONHandler(cmd.OutOrStdout(), &slog.HandlerOptions{
 							Level: slogCfg,
-						})), 
+						})),
 					),
 				)
 
@@ -55,10 +55,12 @@ func NewDogger(version string) *cobra.Command {
 					return err
 				}
 
-				db, err := sql.Open("sqlite3", ":memory:")
+				db, err := sql.Open("sqlite3", "file:dogger?mode=memory&cache=shared")
 				if err != nil {
 					return err
 				}
+				db.SetMaxOpenConns(1)
+				db.SetMaxIdleConns(1)
 
 				store, err := sqlstorage.New(db)
 				if err != nil {
@@ -71,28 +73,37 @@ func NewDogger(version string) *cobra.Command {
 				}
 				log.SetFormat(log.JSONFormat)
 
+				slogger := logutil.SloggerFrom(ctx)
+
+				containerBackend := &backends.ContainerBackend{Context: ctx, Storage: store}
+				imageBackend := &backends.ImageBackend{Storage: store}
+				systemBackend := &backends.SystemBackend{}
+				handler := handler.New().
+					// TODO(frantjc): Implement all of these.
+					WithSystemBackend(systemBackend, nil, nil).
+					WithImageBackend(imageBackend, nil).
+					WithContainerBackend(containerBackend).
+					Handler(ctx, false)
+
 				srv := &http.Server{
 					ReadHeaderTimeout: time.Second * 5,
-					Handler: handler.New().
-						// TODO(frantjc): Implement all of these.
-						WithSystemBackend(&backends.SystemBackend{}, nil, nil).
-						WithImageBackend(&backends.ImageBackend{Storage: store}, nil).
-						WithContainerBackend(&backends.ContainerBackend{Context: ctx, Storage: store}).
-						Handler(ctx, false),
+					Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						slogger.Info("HTTP Request", "method", r.Method, "path", r.URL.Path)
+						handler.ServeHTTP(w, r)
+					}),
 					BaseContext: func(_ net.Listener) context.Context {
 						return ctx // log.WithLogger(ctx, log.L)
 					},
 				}
-				log := logutil.SloggerFrom(ctx)
 
 				eg.Go(func() error {
-					log.Info("listening...", "addr", lis.Addr().String())
+					slogger.Info("listening...", "addr", lis.Addr().String())
 					return srv.Serve(lis)
 				})
 
 				eg.Go(func() error {
 					<-ctx.Done()
-					log.Info("shutting down")
+					slogger.Info("shutting down")
 					if err = srv.Shutdown(context.WithoutCancel(ctx)); err != nil {
 						return err
 					}

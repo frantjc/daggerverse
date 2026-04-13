@@ -24,15 +24,16 @@ func (m *Archive) Tar(
 	}
 	in := fmt.Sprintf("/tmp/%s", name)
 	out := fmt.Sprintf("/tmp/%s.tar", name)
-	flags := "cf"
+	flags := "-cf"
 	if gzip {
-		flags = "czf"
+		flags = "-czf"
 		out = fmt.Sprintf("/tmp/%s.tgz", name)
 	}
 	return dag.Wolfi().
 		Container().
-		WithDirectory(in, directory).
-		WithExec([]string{"tar", "-C", in, flags, out, "."}).
+		WithWorkdir(in).
+		WithDirectory(".", directory).
+		WithExec([]string{"tar", flags, out, "."}).
 		File(out), nil
 }
 
@@ -46,12 +47,12 @@ func (m *Archive) Untar(
 	} else if name == "" {
 		name = "input.tar"
 	}
-	flags := "xf"
+	flags := "-xf"
 	switch {
 	case strings.HasSuffix(name, "gz"):
-		flags = "xzf"
+		flags = "-xzf"
 	case strings.HasSuffix(name, "xz"):
-		flags = "xJf"
+		flags = "-xJf"
 	}
 	base := strings.TrimSuffix(name, ".tgz")
 	base = strings.TrimSuffix(name, ".tar.gz")
@@ -85,8 +86,8 @@ func (m *Archive) Zip(
 		Container(dagger.WolfiContainerOpts{
 			Packages: []string{"zip"},
 		}).
-		WithDirectory(in, directory).
 		WithWorkdir(in).
+		WithDirectory(".", directory).
 		WithExec([]string{"zip", "-r", "-q", out, "."}).
 		File(out), nil
 }

@@ -50,6 +50,10 @@
       "source": "godot"
     },
     {
+      "name": "mise",
+      "source": "mise"
+    },
+    {
       "name": "osslsigncode",
       "source": "osslsigncode"
     },

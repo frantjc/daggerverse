@@ -27,6 +27,8 @@ func New(
 	version string,
 	// +optional
 	additionalWolfiPackages []string,
+	// +optional
+	container *dagger.Container,
 ) (*Go, error) {
 	goMod := source.File("go.mod")
 
@@ -52,11 +54,17 @@ func New(
 		majorMinor = strings.TrimPrefix(majorMinor, "v")
 	}
 
-	m := &Go{
-		Container: dag.Wolfi().
+	if container == nil {
+		container = dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
 				Packages: append([]string{"go-" + majorMinor}, additionalWolfiPackages...),
-			}).
+			})
+	} else if len(additionalWolfiPackages) != 0 {
+		return nil, fmt.Errorf("cannot set both additionalWolfiPackages and container")
+	}
+
+	m := &Go{
+		Container: container.
 			WithEnvVariable("GOPATH", "/go").
 			WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).

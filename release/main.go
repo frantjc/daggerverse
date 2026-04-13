@@ -87,7 +87,7 @@ func (m *Release) Create(
 	assets := []*dagger.File{}
 	checksumsTxt := new(strings.Builder)
 	upx := dag.Upx()
-	tar := dag.Tar()
+	archive := dag.Archive()
 
 	osPlatformVersion, err := dag.DefaultPlatform(ctx)
 	if err != nil {
@@ -145,8 +145,8 @@ func (m *Release) Create(
 			}
 
 			file := fmt.Sprintf("%s-%s-%s-%s.tar.gz", data.Name, data.Version, gs, ga)
-			asset := tar.
-				Create(
+			asset := archive.
+				Tar(
 					module.Filter(dagger.DirectoryFilterOpts{
 						Include: []string{
 							"README.md",
@@ -157,8 +157,8 @@ func (m *Release) Create(
 							data.Name,
 							bin,
 						),
-					dagger.TarCreateOpts{
-						Compress: true,
+					dagger.ArchiveTarOpts{
+						Gzip: true,
 					},
 				).WithName(file)
 

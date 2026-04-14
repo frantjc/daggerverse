@@ -25,17 +25,16 @@ func New(
 	// +optional
 	// +defaultPath="."
 	source *dagger.Directory,
-	// +optional
-	// +default="."
-	path string,
 ) (*DaggerModule, error) {
 	return &DaggerModule{
 		Container: dag.Wolfi().
 			Container().
 			WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/bin/dagger").
-			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", dag.Dagger().Binary(), dagger.ContainerWithFileOpts{Expand: true}).
-			WithWorkdir(filepath.Join("/src", path)).
-			WithMountedDirectory("/src", source),
+			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", dag.Dagger().Binary(), dagger.ContainerWithFileOpts{
+				Expand: true,
+				}).
+			WithWorkdir("/src").
+			WithDirectory(".", source),
 	}, nil
 }
 

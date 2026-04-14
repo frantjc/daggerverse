@@ -35,6 +35,8 @@ func New(
 	// +optional
 	// +default="stable"
 	flavor string,
+	// +optional
+	container *dagger.Container,
 ) (*Godot, error) {
 	defaultPlatform, err := dag.DefaultPlatform(ctx)
 	if err != nil {
@@ -61,21 +63,30 @@ func New(
 		return nil, fmt.Errorf("unsupported architecture %s", arch)
 	}
 
-	godotZipURL := fmt.Sprintf(
-		"https://downloads.godotengine.org/?version=%s&flavor=%s&slug=%s&platform=%s",
-		url.QueryEscape(version),
-		url.QueryEscape(flavor),
-		url.QueryEscape(slug),
-		url.QueryEscape(platform),
-	)
-	godotZip := dag.HTTP(godotZipURL)
-	godotZipPath := filepath.Join(workDir, slug)
-	godotExtractedPath := filepath.Join(workDir, fmt.Sprintf("Godot_v%s-%s_linux%s", version, flavor, ext))
-	godot := dag.Wolfi().
-		Container().
-		WithFile(godotZipPath, godotZip).
-		WithExec([]string{"unzip", "-d", workDir, godotZipPath}).
-		File(godotExtractedPath)
+	if container == nil {
+		godotZipURL := fmt.Sprintf(
+			"https://downloads.godotengine.org/?version=%s&flavor=%s&slug=%s&platform=%s",
+			url.QueryEscape(version),
+			url.QueryEscape(flavor),
+			url.QueryEscape(slug),
+			url.QueryEscape(platform),
+		)
+		godotZip := dag.HTTP(godotZipURL)
+		godotZipPath := filepath.Join(workDir, slug)
+		godotExtractedPath := filepath.Join(workDir, fmt.Sprintf("Godot_v%s-%s_linux%s", version, flavor, ext))
+		godot := dag.Wolfi().
+			Container().
+			WithFile(godotZipPath, godotZip).
+			WithExec([]string{"unzip", "-d", workDir, godotZipPath}).
+			File(godotExtractedPath)
+		container = dag.Wolfi().
+			Container(dagger.WolfiContainerOpts{
+				Packages: []string{"openssl", "zlib"},
+			}).
+			WithFile("/usr/bin/godot", godot).
+			WithWorkdir("/src").
+			WithDirectory(".", src)
+	}
 
 	exportTemplatesZipURL := fmt.Sprintf(
 		"https://downloads.godotengine.org/?version=%s&flavor=%s&slug=%s&platform=%s",
@@ -94,13 +105,7 @@ func New(
 		Directory(exportTemplatesExtractedPath)
 
 	return &Godot{
-		Container: dag.Wolfi().
-			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"openssl", "zlib"},
-			}).
-			WithFile("/usr/bin/godot", godot).
-			WithWorkdir("/src").
-			WithDirectory(".", src),
+		Container: container,
 		ExportTemplates: exportTemplates,
 		Version:         version,
 		Flavor:          flavor,

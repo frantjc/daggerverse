@@ -26,16 +26,14 @@ func New(
 		source = dag.Directory().
 			WithFile("mise.toml", config)
 	}
-	// else {
-	// 	source = source.Filter(dagger.DirectoryFilterOpts{
-	// 		Include: []string{"mise.toml"},
-	// 	})
-	// }
 
 	return &Mise{
 		Container: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"curl"}, // or wget
+				Packages: []string{
+					"curl", // or wget
+					"git",
+				}, 
 			}).
 			WithFile("/usr/bin/mise-run", dag.HTTP("https://mise.run/"), dagger.ContainerWithFileOpts{
 				Permissions: 0755,

@@ -26,13 +26,49 @@ func New(
 	// +defaultPath="."
 	source *dagger.Directory,
 ) (*DaggerModule, error) {
+	version, err := dag.Version(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	osPlatformVersion, err := dag.DefaultPlatform(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	parts := strings.Split(string(osPlatformVersion), "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid dagger platform %s", osPlatformVersion)
+	}
+
+	platform := parts[1]
+
+	daggerTgz := dag.HTTP(
+		fmt.Sprintf(
+			"https://github.com/dagger/dagger/releases/download/%s/dagger_%s_linux_%s.tar.gz",
+			version, version, platform,
+		),
+	)
+
+	tmpDaggerTgzPath := "/tmp/dagger.tgz"
+	tmpDaggerPath := "/tmp/dagger"
+
 	return &DaggerModule{
 		Container: dag.Wolfi().
 			Container().
-			WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/bin/dagger").
-			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", dag.Dagger().Binary(), dagger.ContainerWithFileOpts{
-				Expand: true,
-				}).
+			WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/local/bin/dagger").
+			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN",
+				dag.Wolfi().
+					Container().
+					WithFile(tmpDaggerTgzPath, daggerTgz).
+					WithExec([]string{
+						"tar", "-xzf", tmpDaggerTgzPath, "-C", filepath.Dir(tmpDaggerPath), filepath.Base(tmpDaggerPath),
+					}).
+					File(tmpDaggerPath),
+					dagger.ContainerWithFileOpts{
+						Expand: true,
+					},
+			).
 			WithWorkdir("/src").
 			WithDirectory(".", source),
 	}, nil

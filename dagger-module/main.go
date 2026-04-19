@@ -50,25 +50,13 @@ func New(
 		),
 	)
 
-	tmpDaggerTgzPath := "/tmp/dagger.tgz"
-	tmpDaggerPath := "/tmp/dagger"
-
 	return &DaggerModule{
 		Container: dag.Wolfi().
 			Container().
 			WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/local/bin/dagger").
-			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN",
-				dag.Wolfi().
-					Container().
-					WithFile(tmpDaggerTgzPath, daggerTgz).
-					WithExec([]string{
-						"tar", "-xzf", tmpDaggerTgzPath, "-C", filepath.Dir(tmpDaggerPath), filepath.Base(tmpDaggerPath),
-					}).
-					File(tmpDaggerPath),
-					dagger.ContainerWithFileOpts{
-						Expand: true,
-					},
-			).
+			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", dag.Archive().Untar(daggerTgz).File("dagger"), dagger.ContainerWithFileOpts{
+				Expand: true,
+			}).
 			WithWorkdir("/src").
 			WithDirectory(".", source),
 	}, nil
@@ -153,7 +141,8 @@ func (m *DaggerModule) Bump(ctx context.Context) (*dagger.Changeset, error) {
 				Source: daggerDeveloped,
 			}).
 				Container().
-				WithExec([]string{"go", "get", "-u", fmt.Sprintf("dagger.io/dagger@%s", version)}).
+				// NB: This was for Dagger v0.19.11 < version < v0.20.5, which continued to use to SDK v0.19.11.
+				// WithExec([]string{"go", "get", "-u", fmt.Sprintf("dagger.io/dagger@%s", version)}).
 				WithExec([]string{"go", "get", "-u", fmt.Sprintf("github.com/dagger/dagger@%s", version)}).
 				Directory(".")
 			container = container.WithDirectory(

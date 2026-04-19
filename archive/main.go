@@ -55,8 +55,8 @@ func (m *Archive) Untar(
 		flags = "-xJf"
 	}
 	base := strings.TrimSuffix(name, ".tgz")
-	base = strings.TrimSuffix(name, ".tar.gz")
-	base = strings.TrimSuffix(name, ".tar.xz")
+	base = strings.TrimSuffix(base, ".tar.gz")
+	base = strings.TrimSuffix(base, ".tar.xz")
 	if base == "" {
 		base = "output"
 	}

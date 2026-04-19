@@ -3,15 +3,16 @@ module github.com/frantjc/daggerverse/dagger-module
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6
+	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/dagger v0.20.6
 	github.com/dagger/otel-go v1.41.1-0.20260303185236-072f65948887
 	github.com/vektah/gqlparser/v2 v2.5.32
 	go.opentelemetry.io/otel v1.43.0
-	go.opentelemetry.io/otel/sdk v1.42.0
 	go.opentelemetry.io/otel/trace v1.43.0
 )
+
+require go.opentelemetry.io/otel/sdk v1.42.0
 
 require (
 	github.com/99designs/gqlgen v0.17.89 // indirect

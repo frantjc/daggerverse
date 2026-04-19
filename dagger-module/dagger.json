@@ -6,6 +6,10 @@
   },
   "dependencies": [
     {
+      "name": "archive",
+      "source": "../archive"
+    },
+    {
       "name": "go",
       "source": "../go"
     },

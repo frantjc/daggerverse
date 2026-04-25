@@ -19,6 +19,10 @@ func New(
 	config *dagger.File,
 	// +optional
 	tools []string,
+	// +optional
+	noEnv,
+	// +optional
+	noHooks bool,
 ) (*Mise, error) {
 	if source == nil && config == nil {
 		return nil, fmt.Errorf("one of source and config is required")
@@ -26,6 +30,16 @@ func New(
 		source = dag.Directory().
 			WithFile("mise.toml", config)
 	}
+
+	exec := []string{"mise", "--yes"}
+	if noEnv {
+		exec = append(exec, "--no-env")
+	}
+	if noHooks {
+		exec = append(exec, "--no-hooks")
+	}
+	exec = append(exec, "install")
+	exec = append(exec, tools...)
 
 	return &Mise{
 		Container: dag.Wolfi().
@@ -44,6 +58,6 @@ func New(
 			}).
 			WithWorkdir("/src").
 			WithDirectory(".", source).
-			WithExec(append([]string{"mise", "--yes", "install"}, tools...)),
+			WithExec(exec),
 	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	xslices "github.com/frantjc/x/slices"
 	"github.com/logsquaredn/rubber-mm/.dagger/modules/mise/internal/dagger"
 )
 
@@ -18,7 +19,9 @@ func New(
 	// +optional
 	config *dagger.File,
 	// +optional
-	tools []string,
+	tools,
+	// +optional
+	additionalWolfiPackages []string,
 	// +optional
 	noEnv,
 	// +optional
@@ -40,14 +43,15 @@ func New(
 	}
 	exec = append(exec, "install")
 	exec = append(exec, tools...)
+	
 
 	return &Mise{
 		Container: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
-				Packages: []string{
-					"curl", // or wget
+				Packages: xslices.Unique(append(additionalWolfiPackages,
+					"curl", // Or wget.
 					"git",
-				}, 
+				)), 
 			}).
 			WithFile("/usr/bin/mise-run", dag.HTTP("https://mise.run/"), dagger.ContainerWithFileOpts{
 				Permissions: 0755,

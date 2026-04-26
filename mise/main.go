@@ -34,17 +34,6 @@ func New(
 			WithFile("mise.toml", config)
 	}
 
-	exec := []string{"mise", "--yes"}
-	if noEnv {
-		exec = append(exec, "--no-env")
-	}
-	if noHooks {
-		exec = append(exec, "--no-hooks")
-	}
-	exec = append(exec, "install")
-	exec = append(exec, tools...)
-	
-
 	return &Mise{
 		Container: dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
@@ -61,7 +50,19 @@ func New(
 				Expand: true,
 			}).
 			WithWorkdir("/src").
+			With(func(r *dagger.Container) *dagger.Container {
+				if noEnv {
+					return r.WithEnvVariable("MISE_NO_ENV", "1")
+				}
+				return r
+			}).
+			With(func(r *dagger.Container) *dagger.Container {
+				if noHooks {
+					return r.WithEnvVariable("MISE_NO_HOOKS", "1")
+				}
+				return r
+			}).
 			WithDirectory(".", source).
-			WithExec(exec),
+			WithExec(append([]string{"mise", "--yes"}, tools...)),
 	}, nil
 }

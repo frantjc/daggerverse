@@ -63,6 +63,6 @@ func New(
 				return r
 			}).
 			WithDirectory(".", source).
-			WithExec(append([]string{"mise", "--yes"}, tools...)),
+			WithExec(append([]string{"mise", "--yes", "install"}, tools...)),
 	}, nil
 }

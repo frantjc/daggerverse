@@ -58,7 +58,7 @@ func New(
 				Expand: true,
 			}).
 			WithWorkdir("/src").
-			WithDirectory(".", source),
+			WithMountedDirectory(".", source),
 	}, nil
 }
 

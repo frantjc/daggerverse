@@ -85,7 +85,7 @@ func New(
 			}).
 			WithFile("/usr/bin/godot", godot).
 			WithWorkdir("/src").
-			WithDirectory(".", src)
+			WithMountedDirectory(".", src)
 	}
 
 	exportTemplatesZipURL := fmt.Sprintf(

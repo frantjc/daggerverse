@@ -1,6 +1,6 @@
 {
   "name": "godot",
-  "engineVersion": "v0.20.6",
+  "engineVersion": "v0.20.8",
   "sdk": {
     "source": "go"
   },
@@ -11,8 +11,8 @@
     },
     {
       "name": "wolfi",
-      "source": "github.com/dagger/dagger/modules/wolfi@v0.20.6",
-      "pin": "220be71b0cc1c09f4d70a37df1615800187c9fad"
+      "source": "github.com/dagger/dagger/modules/wolfi@v0.20.8",
+      "pin": "74bff7d10fd78dd6935c60c4514558598f216451"
     }
   ]
 }

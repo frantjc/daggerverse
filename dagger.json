@@ -1,6 +1,6 @@
 {
   "name": "daggerverse-dev",
-  "engineVersion": "v0.20.6",
+  "engineVersion": "v0.20.8",
   "sdk": {
     "source": "go"
   },
@@ -44,6 +44,10 @@
     {
       "name": "godot",
       "source": "godot"
+    },
+    {
+      "name": "kwok",
+      "source": "kwok"
     },
     {
       "name": "mise",

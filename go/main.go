@@ -42,36 +42,36 @@ func New(
 		return nil, err
 	}
 
-	if version == "" {
-		version = parsedGoMod.Go.Version
-	}
-
-	version = xstrings.EnsurePrefix(version, "v")
-	majorMinor := semver.MajorMinor(version)
-	if majorMinor == "" {
-		majorMinor = strings.TrimPrefix(version, "v")
-	} else {
-		majorMinor = strings.TrimPrefix(majorMinor, "v")
-	}
-
 	if container == nil {
+		if version == "" {
+			version = parsedGoMod.Go.Version
+		}
+
+		version = xstrings.EnsurePrefix(version, "v")
+		majorMinor := semver.MajorMinor(version)
+		if majorMinor == "" {
+			majorMinor = strings.TrimPrefix(version, "v")
+		} else {
+			majorMinor = strings.TrimPrefix(majorMinor, "v")
+		}
+
 		container = dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
 				Packages: append([]string{"go-" + majorMinor}, additionalWolfiPackages...),
-			})
-	} else if len(additionalWolfiPackages) != 0 {
-		return nil, fmt.Errorf("cannot set both additionalWolfiPackages and container")
-	}
-
-	m := &Go{
-		Container: container.
+			}).
 			WithEnvVariable("GOPATH", "/go").
 			WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}).
 			WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true}),
+			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true})
+	} else if len(additionalWolfiPackages) != 0 {
+		return nil, fmt.Errorf("cannot set both additionalWolfiPackages and container")
+	}
+
+	m := &Go{
+		Container: container,
 	}
 
 	if source == nil {
@@ -85,6 +85,10 @@ func New(
 		WithExec([]string{"go", "mod", "download"})
 	
 	return m, nil
+}
+
+func (m *Go) WithServiceBinding(alias string, service *dagger.Service) *Go {
+	return &Go{Container: m.Container.WithServiceBinding(alias, service)}
 }
 
 func (m *Go) Build(
@@ -139,9 +143,34 @@ func (m *Go) Test(
 	// +optional
 	// +default="./..."
 	pkg string,
+	// +optional
+	verbose bool,
+	// +optional
+	race bool,
+	// +optional
+	cgo bool,
+	// +optional
+	tags []string,
 ) error {
+	args := []string{"go", "test"}
+	if verbose {
+		args = append(args, "-v")
+	}
+	if race {
+		args = append(args, "-race")
+	}
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+	args = append(args, pkg)
 	_, err := m.Container.
-		WithExec([]string{"go", "test", "-race", pkg}, dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true}).
+		With(func(c *dagger.Container) *dagger.Container {
+			if !cgo {
+				return c.WithEnvVariable("CGO_ENABLED", "0")
+			}
+			return c.WithEnvVariable("CGO_ENABLED", "1")
+		}).
+		WithExec(args, dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true}).
 		Sync(ctx)
 	return err
 }

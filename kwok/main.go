@@ -192,7 +192,9 @@ func (m *Kwok) Cluster(
 	container = container.WithExposedPort(kubeApiserverInsecurePort, dagger.ContainerWithExposedPortOpts{
 			Description: "kube-apiserver",
 		}).
-		WithExec(createClusterExec)
+		WithExec(createClusterExec, dagger.ContainerWithExecOpts{
+			Expand: true,
+		})
 
 	return &Cluster{
 		Container:                 container,

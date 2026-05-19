@@ -111,31 +111,33 @@ func (m *Kwok) Cluster(
 		}
 	}
 
-	exec := []string{"kwokctl", "create", "cluster", "--wait", "9s"}
+	createClusterExec := []string{"kwokctl", "create", "cluster", "--wait", "9s"}
 
 	for _, component := range components {
-		exec = append(exec, "--components", component)
+		createClusterExec = append(createClusterExec, "--components", component)
 	}
 
 	if controllerPort != 0 {
-		container = container.WithExposedPort(controllerPort)
-		exec = append(exec, "--controller-port", fmt.Sprint(controllerPort))
+		container = container.WithExposedPort(controllerPort, dagger.ContainerWithExposedPortOpts{
+			Description: "kwok-controller",
+		})
+		createClusterExec = append(createClusterExec, "--controller-port", fmt.Sprint(controllerPort))
 	}
 
 	for _, d := range disable {
-		exec = append(exec, "--disable", d)
+		createClusterExec = append(createClusterExec, "--disable", d)
 	}
 
 	if disableQPSLimits {
-		exec = append(exec, "--disable-qps-limits")
+		createClusterExec = append(createClusterExec, "--disable-qps-limits")
 	}
 
 	for _, e := range enable {
-		exec = append(exec, "--enable", e)
+		createClusterExec = append(createClusterExec, "--enable", e)
 	}
 
 	for _, e := range enableCRDs {
-		exec = append(exec, "--enable-crds", e)
+		createClusterExec = append(createClusterExec, "--enable-crds", e)
 	}
 
 	binaryArgs := map[string]*dagger.File{
@@ -154,7 +156,7 @@ func (m *Kwok) Cluster(
 
 		if f := binaryArgs[binary]; f != nil {
 			container = container.WithFile(path, f, dagger.ContainerWithFileOpts{Permissions: 0700})
-			exec = append(exec, binaryFlag, path)
+			createClusterExec = append(createClusterExec, binaryFlag, path)
 		} else if binaryDefault, ok := flags[binaryFlag]; ok {
 			binaryDefaultURL, err := binaryDefault.URL()
 			if err != nil {
@@ -174,7 +176,7 @@ func (m *Kwok) Cluster(
 				}
 				path := fmt.Sprintf("/usr/local/bin/%s", binary)
 				container = container.WithFile(path, file, dagger.ContainerWithFileOpts{Permissions: 0700})
-				exec = append(exec, binaryFlag, path)
+				createClusterExec = append(createClusterExec, binaryFlag, path)
 			}
 		}
 	}
@@ -184,11 +186,13 @@ func (m *Kwok) Cluster(
 		container = container.WithFile(path, kubeAuditPolicy, dagger.ContainerWithFileOpts{
 			Expand: true,
 		})
-		exec = append(exec, "--kube-audit-policy", path)
+		createClusterExec = append(createClusterExec, "--kube-audit-policy", path)
 	}
 
-	container = container.WithExposedPort(kubeApiserverInsecurePort).
-		WithExec(exec)
+	container = container.WithExposedPort(kubeApiserverInsecurePort, dagger.ContainerWithExposedPortOpts{
+			Description: "kube-apiserver",
+		}).
+		WithExec(createClusterExec)
 
 	return &Cluster{
 		Container:                 container,

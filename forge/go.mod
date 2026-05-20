@@ -3,7 +3,7 @@ module github.com/frantjc/daggerverse/forge
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6
+	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/frantjc/forge v1.0.4
 	github.com/frantjc/x v0.0.0-20251203020658-a4e29ee5477f

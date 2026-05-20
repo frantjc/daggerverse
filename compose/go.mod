@@ -3,7 +3,7 @@ module github.com/frantjc/daggerverse/compose
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6
+	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/vektah/gqlparser/v2 v2.5.33

@@ -91,6 +91,14 @@ func (m *Go) WithServiceBinding(alias string, service *dagger.Service) *Go {
 	return &Go{Container: m.Container.WithServiceBinding(alias, service)}
 }
 
+func (m *Go) WithFile(path string, source *dagger.File) *Go {
+	return &Go{Container: m.Container.WithFile(path, source)}
+}
+
+func (m *Go) WithEnvVariable(name, value string) *Go {
+	return &Go{Container: m.Container.WithEnvVariable(name, value)}
+}
+
 func (m *Go) Build(
 	ctx context.Context,
 	// +optional
@@ -165,10 +173,10 @@ func (m *Go) Test(
 	args = append(args, pkg)
 	_, err := m.Container.
 		With(func(c *dagger.Container) *dagger.Container {
-			if !cgo {
-				return c.WithEnvVariable("CGO_ENABLED", "0")
+			if cgo || race {
+				return c.WithEnvVariable("CGO_ENABLED", "1")
 			}
-			return c.WithEnvVariable("CGO_ENABLED", "1")
+			return c.WithEnvVariable("CGO_ENABLED", "0")
 		}).
 		WithExec(args, dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true}).
 		Sync(ctx)

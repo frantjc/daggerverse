@@ -208,15 +208,12 @@ type Cluster struct {
 	KubeApiserverInsecurePort int
 }
 
-func (c *Cluster) BoundTo(
+func (c *Cluster) KubeConfig(
 	ctx context.Context,
-	// +optional
-	// +defaultAddress="registry.k8s.io/kubectl:v1.33.0"
-	container *dagger.Container,
 	// +optional
 	// +default="kwok"
 	alias string,
-) (*dagger.Container, error) {
+) (*dagger.File, error) {
 	// TODO(frantjc): It would be nice to use the ~/.kube/config from the Service Container.
 	cfg := api.NewConfig()
 	cfg.Clusters[alias] = &api.Cluster{
@@ -230,6 +227,24 @@ func (c *Cluster) BoundTo(
 	cfg.CurrentContext = alias
 
 	rawKubeconfig, err := clientcmd.Write(*cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return dag.File("config", string(rawKubeconfig)), nil
+}
+
+
+func (c *Cluster) BoundTo(
+	ctx context.Context,
+	// +optional
+	// +defaultAddress="registry.k8s.io/kubectl:v1.33.0"
+	container *dagger.Container,
+	// +optional
+	// +default="kwok"
+	alias string,
+) (*dagger.Container, error) {
+	kubeConfig, err := c.KubeConfig(ctx, alias)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +263,7 @@ func (c *Cluster) BoundTo(
 		WithEnvVariable("KUBECONFIG", "$HOME/.kube/config", dagger.ContainerWithEnvVariableOpts{
 			Expand: true,
 		}).
-		WithNewFile("$KUBECONFIG", string(rawKubeconfig), dagger.ContainerWithNewFileOpts{
+		WithFile("$KUBECONFIG", kubeConfig, dagger.ContainerWithFileOpts{
 			Expand: true,
 		}), nil
 }

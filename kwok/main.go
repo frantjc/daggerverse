@@ -233,37 +233,3 @@ func (c *Cluster) KubeConfig(
 
 	return dag.File("config", string(rawKubeconfig)), nil
 }
-
-
-func (c *Cluster) BoundTo(
-	ctx context.Context,
-	// +optional
-	// +defaultAddress="registry.k8s.io/kubectl:v1.33.0"
-	container *dagger.Container,
-	// +optional
-	// +default="kwok"
-	alias string,
-) (*dagger.Container, error) {
-	kubeConfig, err := c.KubeConfig(ctx, alias)
-	if err != nil {
-		return nil, err
-	}
-
-	svc, err := c.Container.
-		AsService(dagger.ContainerAsServiceOpts{
-			Args: []string{"kwokctl", "start", "cluster"},
-		}).
-		Start(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return container.
-		WithServiceBinding(alias, svc).
-		WithEnvVariable("KUBECONFIG", "$HOME/.kube/config", dagger.ContainerWithEnvVariableOpts{
-			Expand: true,
-		}).
-		WithFile("$KUBECONFIG", kubeConfig, dagger.ContainerWithFileOpts{
-			Expand: true,
-		}), nil
-}

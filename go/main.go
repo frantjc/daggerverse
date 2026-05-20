@@ -156,8 +156,6 @@ func (m *Go) Test(
 	// +default="./..."
 	pkg string,
 	// +optional
-	verbose bool,
-	// +optional
 	race bool,
 	// +optional
 	cgo bool,
@@ -165,9 +163,6 @@ func (m *Go) Test(
 	tags []string,
 ) error {
 	args := []string{"go", "test"}
-	if verbose {
-		args = append(args, "-v")
-	}
 	if race {
 		args = append(args, "-race")
 	}

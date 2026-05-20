@@ -26,10 +26,6 @@
       "source": "compose"
     },
     {
-      "name": "dogger",
-      "source": "dogger"
-    },
-    {
       "name": "forge",
       "source": "forge"
     },

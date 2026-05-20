@@ -99,6 +99,10 @@ func (m *Go) WithEnvVariable(name, value string) *Go {
 	return &Go{Container: m.Container.WithEnvVariable(name, value)}
 }
 
+func (m *Go) WithExec(args []string) *Go {
+	return &Go{Container: m.Container.WithExec(args)}
+}
+
 func (m *Go) Build(
 	ctx context.Context,
 	// +optional

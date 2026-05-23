@@ -193,6 +193,36 @@ func (m *Godot) ExportDebug(
 	return m.export(ctx, "debug", preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
+func osslsigncode(
+	ctx context.Context,
+	// +optional
+	// +default="2.13"
+	version string,
+) *dagger.File {
+	src := dag.Git("https://github.com/mtrojnar/osslsigncode").Ref(version).Tree()
+	srcPath := "/src"
+	buildPath := filepath.Join(srcPath, "build")
+
+	return dag.Wolfi().
+		Container(dagger.WolfiContainerOpts{
+			Packages: []string{
+				"build-base",
+				"cmake",
+				"curl-dev",
+				"openssl-dev",
+				"pkgconf",
+				"python3",
+				"zlib-dev",
+			},
+		}).
+		WithMountedDirectory(srcPath, src).
+		WithWorkdir(buildPath).
+		WithExec([]string{"cmake", "-S", "..", "-DCMAKE_INSTALL_PREFIX=/usr/local", "-DCMAKE_BUILD_TYPE=Release"}).
+		WithExec([]string{"cmake", "--build", "."}).
+		WithExec([]string{"cmake", "--install", "."}).
+		File("/usr/local/bin/osslsigncode")
+}
+
 func (m *Godot) export(
 	ctx context.Context,
 	kind,
@@ -255,10 +285,7 @@ func (m *Godot) export(
 			windowsCodesignIdentityPath := "/tmp/windows-codesign-identity"
 			return r.WithFile(
 				"/usr/local/bin/osslsigncode",
-				dag.Osslsigncode(dagger.OsslsigncodeOpts{
-					Version: osslsigncodeVersion,
-				}).
-					Binary(),
+				osslsigncode(ctx, osslsigncodeVersion),
 			).
 				WithMountedFile(windowsCodesignIdentityPath, windowsCodesignIdentity).
 				WithEnvVariable("GODOT_WINDOWS_CODESIGN_IDENTITY", windowsCodesignIdentityPath)

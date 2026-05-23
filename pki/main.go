@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"dagger.io/dagger"
 	"github.com/logsquaredn/rubber/.dagger/modules/pki/internal/dagger"
 )
 

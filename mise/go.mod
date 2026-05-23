@@ -1,12 +1,12 @@
-module github.com/logsquaredn/rubber-mm/.dagger/modules/mise
+module github.com/frantjc/daggerverse/mise
 
 go 1.26.1
 
 require (
 	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
+	github.com/BurntSushi/toml v1.6.0
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
-	github.com/frantjc/x v0.0.0-20260409024326-706eafa13c9b
 	github.com/vektah/gqlparser/v2 v2.5.33
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
@@ -20,6 +20,7 @@ require (
 
 require (
 	github.com/99designs/gqlgen v0.17.90 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -43,7 +44,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401001100-f93e5f3e9f0f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect

@@ -3,7 +3,7 @@ module github.com/frantjc/daggerverse/dagger-module
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6
+	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/dagger v0.20.6
 	github.com/dagger/otel-go v1.41.1-0.20260303185236-072f65948887
@@ -56,7 +56,7 @@ require (
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401001100-f93e5f3e9f0f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect

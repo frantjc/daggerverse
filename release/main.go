@@ -89,16 +89,10 @@ func (m *Release) Create(
 	upx := dag.Upx()
 	archive := dag.Archive()
 
-	osPlatformVersion, err := dag.DefaultPlatform(ctx)
+	arch, err := dag.Arch().Oci(ctx)
 	if err != nil {
 		return err
 	}
-
-	_, platform, ok := strings.Cut(string(osPlatformVersion), "/")
-	if !ok {
-		return fmt.Errorf("invalid dagger platform %s", osPlatformVersion)
-	}
-
 	version, err := dag.Version(ctx)
 	if err != nil {
 		return err
@@ -107,7 +101,7 @@ func (m *Release) Create(
 	daggerTgz := dag.HTTP(
 		fmt.Sprintf(
 			"https://github.com/dagger/dagger/releases/download/%s/dagger_%s_linux_%s.tar.gz",
-			version, version, platform,
+			version, version, arch,
 		),
 	)
 
@@ -117,7 +111,7 @@ func (m *Release) Create(
 	wolfi := dag.Wolfi().
 		Container()
 	dagg3r := wolfi.
-		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/bin/dagger").
+		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/local/bin/dagger").
 		WithFile(
 			"$_EXPERIMENTAL_DAGGER_CLI_BIN",
 			wolfi.

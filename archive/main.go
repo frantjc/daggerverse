@@ -8,7 +8,22 @@ import (
 	"github.com/logsquaredn/rubber/.dagger/modules/archive/internal/dagger"
 )
 
-type Archive struct{}
+type Archive struct {
+	// +private
+	Container *dagger.Container
+}
+
+func New(
+	// +optional
+	container *dagger.Container,
+) *Archive {
+	if container == nil {
+		container = dag.Wolfi().Container(dagger.WolfiContainerOpts{
+			Packages: []string{"zip"},
+		})
+	}
+	return &Archive{container}
+}
 
 func (m *Archive) Tar(
 	ctx context.Context,
@@ -29,8 +44,7 @@ func (m *Archive) Tar(
 		flags = "-czf"
 		out = fmt.Sprintf("/tmp/%s.tgz", name)
 	}
-	return dag.Wolfi().
-		Container().
+	return m.Container.
 		WithWorkdir(in).
 		WithDirectory(".", directory).
 		WithExec([]string{"tar", flags, out, "."}).
@@ -62,8 +76,7 @@ func (m *Archive) Untar(
 	}
 	in := fmt.Sprintf("/tmp/%s", name)
 	out := fmt.Sprintf("/tmp/%s", base)
-	return dag.Wolfi().
-		Container().
+	return m.Container.
 		WithFile(in, file).
 		WithWorkdir(out).
 		WithExec([]string{"tar", flags, in}).
@@ -82,10 +95,7 @@ func (m *Archive) Zip(
 	}
 	in := fmt.Sprintf("/tmp/%s", name)
 	out := fmt.Sprintf("/tmp/%s.zip", name)
-	return dag.Wolfi().
-		Container(dagger.WolfiContainerOpts{
-			Packages: []string{"zip"},
-		}).
+	return m.Container.
 		WithWorkdir(in).
 		WithDirectory(".", directory).
 		WithExec([]string{"zip", "-r", "-q", out, "."}).

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"dagger.io/dagger"
 	"github.com/logsquaredn/rubber/.dagger/modules/pki/internal/dagger"
 )
 
@@ -27,18 +28,22 @@ func New(
 	// An existing CA private key. If omitted, a new RSA-4096 key is generated.
 	// +optional
 	caKey *dagger.Secret,
+	// +optional
+	container *dagger.Container,
 ) *PKI {
-	ctr := dag.Wolfi().
-		Container(dagger.WolfiContainerOpts{Packages: []string{"openssl"}})
+	if container == nil {
+		container = dag.Wolfi().
+			Container(dagger.WolfiContainerOpts{Packages: []string{"openssl"}})
+	}
 
 	if caKey != nil {
 		return &PKI{
-			Container: ctr.WithMountedSecret(caKeyPath, caKey),
+			Container: container.WithMountedSecret(caKeyPath, caKey),
 		}
 	}
 
 	return &PKI{
-		Container: ctr.WithExec([]string{
+		Container: container.WithExec([]string{
 			"openssl", "genrsa", "-out", caKeyPath, "4096",
 		}),
 	}

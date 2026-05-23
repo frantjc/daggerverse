@@ -36,9 +36,9 @@ func New(
 			}).
 			WithMountedDirectory(srcPath, src).
 			WithWorkdir(buildPath).
-			WithExec([]string{"cmake", "-S", "..", "-DCMAKE_INSTALL_PREFIX=/usr", "-DCMAKE_BUILD_TYPE=Release"}).
+			WithExec([]string{"cmake", "-S", "..", "-DCMAKE_INSTALL_PREFIX=/usr/local", "-DCMAKE_BUILD_TYPE=Release"}).
 			WithExec([]string{"cmake", "--build", "."}).
 			WithExec([]string{"cmake", "--install", "."}).
-			File("/usr/bin/osslsigncode"),
+			File("/usr/local/bin/osslsigncode"),
 	}, nil
 }

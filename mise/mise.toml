@@ -1,0 +1,6 @@
+[tools]
+node = "latest"
+
+[env]
+_.path = ["./node_modules/.bin", "./bin"]
+_.source = ".env"

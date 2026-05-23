@@ -38,17 +38,11 @@ func New(
 	// +optional
 	container *dagger.Container,
 ) (*Godot, error) {
-	defaultPlatform, err := dag.DefaultPlatform(ctx)
+	arch, err := dag.Arch().Oci(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	parts := strings.Split(string(defaultPlatform), "/")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid platform %s", defaultPlatform)
-	}
-
-	arch := parts[1]
 	platform := "linux.64"
 	slug := "linux.x86_64.zip"
 	ext := ".x86_64"
@@ -83,7 +77,7 @@ func New(
 			Container(dagger.WolfiContainerOpts{
 				Packages: []string{"openssl", "zlib"},
 			}).
-			WithFile("/usr/bin/godot", godot).
+			WithFile("/usr/local/bin/godot", godot).
 			WithWorkdir("/src").
 			WithMountedDirectory(".", src)
 	}
@@ -105,7 +99,7 @@ func New(
 		Directory(exportTemplatesExtractedPath)
 
 	return &Godot{
-		Container: container,
+		Container:       container,
 		ExportTemplates: exportTemplates,
 		Version:         version,
 		Flavor:          flavor,
@@ -260,7 +254,7 @@ func (m *Godot) export(
 			}
 			windowsCodesignIdentityPath := "/tmp/windows-codesign-identity"
 			return r.WithFile(
-				"/usr/bin/osslsigncode",
+				"/usr/local/bin/osslsigncode",
 				dag.Osslsigncode(dagger.OsslsigncodeOpts{
 					Version: osslsigncodeVersion,
 				}).

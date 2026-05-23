@@ -11,13 +11,19 @@ type Gh struct {
 	Container *dagger.Container
 }
 
-func New(githubToken *dagger.Secret) *Gh {
-	return &Gh{
-		Container: dag.Wolfi().
+func New(
+	githubToken *dagger.Secret,
+	// +optional
+	container *dagger.Container,
+) *Gh {
+	if container == nil {
+		container = dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
 				Packages: []string{"gh"},
-			}).
-			WithSecretVariable("GITHUB_TOKEN", githubToken),
+			})
+	}
+	return &Gh{
+		Container: container.WithSecretVariable("GITHUB_TOKEN", githubToken),
 	}
 }
 

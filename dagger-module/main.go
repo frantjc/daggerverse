@@ -25,34 +25,32 @@ func New(
 	// +optional
 	// +defaultPath="."
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) (*DaggerModule, error) {
+	if container == nil {
+		container = dag.Wolfi().Container()
+	}
+
 	version, err := dag.Version(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	osPlatformVersion, err := dag.DefaultPlatform(ctx)
+	arch, err := dag.Arch().Oci(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	parts := strings.Split(string(osPlatformVersion), "/")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid dagger platform %s", osPlatformVersion)
-	}
-
-	platform := parts[1]
-
 	daggerTgz := dag.HTTP(
 		fmt.Sprintf(
 			"https://github.com/dagger/dagger/releases/download/%s/dagger_%s_linux_%s.tar.gz",
-			version, version, platform,
+			version, version, arch,
 		),
 	)
 
 	return &DaggerModule{
-		Container: dag.Wolfi().
-			Container().
+		Container: container.
 			WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/usr/local/bin/dagger").
 			WithFile("$_EXPERIMENTAL_DAGGER_CLI_BIN", dag.Archive().Untar(daggerTgz).File("dagger"), dagger.ContainerWithFileOpts{
 				Expand: true,
@@ -162,7 +160,7 @@ func (m *DaggerModule) Bump(ctx context.Context) (*dagger.Changeset, error) {
 	cs := container.
 		Directory("/src").
 		Changes(m.Container.Directory("/src"))
-	
+
 	m.Container = container
 
 	return cs, nil

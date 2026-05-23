@@ -18,6 +18,10 @@
   ],
   "dependencies": [
     {
+      "name": "arch",
+      "source": "arch"
+    },
+    {
       "name": "archive",
       "source": "archive"
     },

@@ -10,12 +10,18 @@ type Upx struct {
 	Container *dagger.Container
 }
 
-func New() (*Upx, error) {
-	return &Upx{
-		Container: dag.Wolfi().
+func New(
+	// +optional
+	container *dagger.Container,
+) (*Upx, error) {
+	if container == nil {
+		container = dag.Wolfi().
 			Container(dagger.WolfiContainerOpts{
 				Packages: []string{"upx"},
-			}),
+			})
+	}
+	return &Upx{
+		Container: container,
 	}, nil
 }
 

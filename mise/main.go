@@ -272,6 +272,9 @@ func (m *Mise) Container(
 				Packages: packages,
 			}).
 			WithEnvVariable("HOME", "/root").
+			WithEnvVariable("PATH", "$HOME/.local/bin:$PATH", dagger.ContainerWithEnvVariableOpts{
+				Expand: true,
+			}).
 			WithFile("$HOME/.local/bin/mise", mise, dagger.ContainerWithFileOpts{
 				Expand: true,
 			})
@@ -310,7 +313,7 @@ func (m *Mise) Container(
 
 	container = container.
 		WithMountedCache(miseDataDir, dag.CacheVolume("mise-data")).
-		WithEnvVariable("PATH", fmt.Sprintf("%s:$HOME/.local/bin:$PATH", filepath.Join(miseDataDir, "shims")), dagger.ContainerWithEnvVariableOpts{
+		WithEnvVariable("PATH", fmt.Sprintf("%s:$PATH", filepath.Join(miseDataDir, "shims")), dagger.ContainerWithEnvVariableOpts{
 			Expand: true,
 		})
 
@@ -359,6 +362,8 @@ func (m *Mise) Container(
 		fmt.Fprintln(envFile, strings.TrimPrefix(scanner.Text(), "export "))
 	}
 	container = container.WithEnvFileVariables(dag.File(".env", envFile.String()).AsEnvFile())
+
+	container = container.WithMountedDirectory(".", m.Source)
 
 	return container, nil
 }

@@ -10,10 +10,6 @@
       "source": "../arch"
     },
     {
-      "name": "osslsigncode",
-      "source": "../osslsigncode"
-    },
-    {
       "name": "wolfi",
       "source": "github.com/dagger/dagger/modules/wolfi@v0.20.8",
       "pin": "74bff7d10fd78dd6935c60c4514558598f216451"

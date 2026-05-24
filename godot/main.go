@@ -28,12 +28,11 @@ type Godot struct {
 
 func New(
 	ctx context.Context,
-	src *dagger.Directory,
 	// +optional
 	// +default="4.6.1"
 	version,
 	// +optional
-	// +default="stable"
+	// +default=stable
 	flavor string,
 	// +optional
 	container *dagger.Container,
@@ -77,9 +76,8 @@ func New(
 			Container(dagger.WolfiContainerOpts{
 				Packages: []string{"openssl", "zlib"},
 			}).
-			WithFile("/usr/local/bin/godot", godot).
-			WithWorkdir("/src").
-			WithMountedDirectory(".", src)
+			WithEnvVariable("HOME", "/root").
+			WithFile("/usr/local/bin/godot", godot)
 	}
 
 	exportTemplatesZipURL := fmt.Sprintf(
@@ -159,6 +157,7 @@ type Export struct {
 
 func (m *Godot) ExportRelease(
 	ctx context.Context,
+	source *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -172,11 +171,12 @@ func (m *Godot) ExportRelease(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "release", preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "release", source, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func (m *Godot) ExportDebug(
 	ctx context.Context,
+	source *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -190,11 +190,10 @@ func (m *Godot) ExportDebug(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "debug", preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "debug", source, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func osslsigncode(
-	ctx context.Context,
 	// +optional
 	// +default="2.13"
 	version string,
@@ -225,16 +224,19 @@ func osslsigncode(
 
 func (m *Godot) export(
 	ctx context.Context,
-	kind,
+	kind string,
+	source *dagger.Directory,
 	preset,
-	path,
+	path string,
 	osslsigncodeVersion string,
 	scriptEncryptionKey *dagger.Secret,
 	windowsCodesignIdentityType string,
 	windowsCodesignIdentity *dagger.File,
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	rawExportPresets, err := m.Container.File("export_presets.cfg").Contents(ctx)
+	container := m.Container.WithWorkdir("/src").WithMountedDirectory(".", source)
+
+	rawExportPresets, err := container.File("export_presets.cfg").Contents(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -259,9 +261,21 @@ func (m *Godot) export(
 
 	embedPck, _ := strconv.ParseBool(options.Key("binary_format/embed_pck").Value())
 
-	export := m.Container.
-		WithEnvVariable("HOME", "/root").
-		WithDirectory(fmt.Sprintf("$HOME/.local/share/godot/export_templates/%s.%s", m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
+
+	xdgDataHome, err := container.EnvVariable(ctx, "XDG_DATA_HOME")
+	if err != nil {
+		return nil, err
+	} else if xdgDataHome == "" {
+		home, err := container.EnvVariable(ctx, "HOME")
+		if err != nil {
+			return nil, err
+		}
+
+		xdgDataHome = filepath.Join(home, ".local", "share")
+	}
+	
+	export := container.
+		WithDirectory(fmt.Sprintf("%s/export_templates/%s.%s", xdgDataHome, m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
 			Expand: true,
 		}).
 		With(func(r *dagger.Container) *dagger.Container {
@@ -285,7 +299,7 @@ func (m *Godot) export(
 			windowsCodesignIdentityPath := "/tmp/windows-codesign-identity"
 			return r.WithFile(
 				"/usr/local/bin/osslsigncode",
-				osslsigncode(ctx, osslsigncodeVersion),
+				osslsigncode(osslsigncodeVersion),
 			).
 				WithMountedFile(windowsCodesignIdentityPath, windowsCodesignIdentity).
 				WithEnvVariable("GODOT_WINDOWS_CODESIGN_IDENTITY", windowsCodesignIdentityPath)

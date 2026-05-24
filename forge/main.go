@@ -173,7 +173,7 @@ func (a *PreAction) Pre(ctx context.Context) (*Action, error) {
 		return nil, err
 	}
 
-	a.Ctr, err = withShim(ctx, a.Container())
+	a.Ctr, err = withShim(a.Container())
 	if err != nil {
 		return nil, err
 	}
@@ -470,12 +470,11 @@ func (a *FinalizedAction) Output(ctx context.Context) (string, error) {
 	return strings.Join(envconv.MapToArr(output), "\n"), nil
 }
 
-func withShim(ctx context.Context, container *dagger.Container) (*dagger.Container, error) {
+func withShim(container *dagger.Container) (*dagger.Container, error) {
 	src := dag.CurrentModule().Source()
 
 	shim := dag.Go(dagger.GoOpts{
 		Source: src,
-		AdditionalWolfiPackages: []string{"gcc"},
 	}).
 		Build(dagger.GoBuildOpts{
 			Pkg:     "./cmd/shim",

@@ -23,6 +23,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/frantjc/x v0.0.0-20260522024331-2b0e2e3e0b76
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect

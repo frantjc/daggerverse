@@ -81,7 +81,7 @@ func (m *Compose) Up(
 
 		loaderConfig.ConfigFiles = append(loaderConfig.ConfigFiles, types.ConfigFile{
 			Filename: filepath.Base(f),
-			Content:  []byte(content),
+			Content:  content,
 		})
 	}
 

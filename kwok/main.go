@@ -77,6 +77,8 @@ func (m *Kwok) Cluster(
 	// +optional
 	etcd *dagger.File,
 	// +optional
+	jaeger *dagger.File,
+	// +optional
 	kubeApiserver *dagger.File,
 	// +optional
 	kubeScheduler *dagger.File,
@@ -84,6 +86,10 @@ func (m *Kwok) Cluster(
 	kubeControllerManager *dagger.File,
 	// +optional
 	kwokController *dagger.File,
+	// +optional
+	metricsServer *dagger.File,
+	// +optional
+	prometheus *dagger.File,
 ) (*Cluster, error) {
 	rawHelp, err := container.WithExec([]string{"kwokctl", "create", "cluster", "--help"}).Stdout(ctx)
 	if err != nil {
@@ -111,7 +117,7 @@ func (m *Kwok) Cluster(
 		}
 	}
 
-	createClusterExec := []string{"kwokctl", "create", "cluster", "--wait", "9s"}
+	createClusterExec := []string{"kwokctl", "create", "cluster", "--wait", "9s", "--runtime", "binary"}
 
 	for _, component := range components {
 		createClusterExec = append(createClusterExec, "--components", component)
@@ -142,15 +148,22 @@ func (m *Kwok) Cluster(
 
 	binaryArgs := map[string]*dagger.File{
 		"etcd":                    etcd,
+		"jaeger":                  jaeger,
 		"kube-apiserver":          kubeApiserver,
 		"kube-scheduler":          kubeScheduler,
 		"kube-controller-manager": kubeControllerManager,
 		"kwok-controller":         kwokController,
+		"metrics-server":          metricsServer,
+		"prometheus":              prometheus,
 	}
 
 	archive := dag.Archive()
 
 	for binary := range binaryArgs {
+		if _, ok := componentMap[binary]; !ok {
+			continue
+		}
+
 		binaryFlag := fmt.Sprintf("--%s-binary", binary)
 		path := fmt.Sprintf("/usr/local/bin/%s", binary)
 
@@ -190,8 +203,8 @@ func (m *Kwok) Cluster(
 	}
 
 	container = container.WithExposedPort(kubeApiserverInsecurePort, dagger.ContainerWithExposedPortOpts{
-			Description: "kube-apiserver",
-		}).
+		Description: "kube-apiserver",
+	}).
 		WithExec(createClusterExec, dagger.ContainerWithExecOpts{
 			Expand: true,
 		})

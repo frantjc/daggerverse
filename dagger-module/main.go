@@ -13,6 +13,7 @@ import (
 )
 
 type DaggerModule struct {
+	// +private
 	Container *dagger.Container
 }
 

@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/semver/v3"
 	"github.com/frantjc/daggerverse/mise/internal/dagger"
+	xslices "github.com/frantjc/x/slices"
 )
 
 type ConfigMinVersion struct {
@@ -138,6 +142,7 @@ type Config struct {
 }
 
 type Mise struct {
+	// +private
 	Version string
 	// +private
 	Source *dagger.Directory
@@ -161,11 +166,10 @@ func New(
 				Hard: v.String(),
 			},
 		},
-		Source: dag.Directory(),
 	}, nil
 }
 
-func (m *Mise) WithConfigFile(
+func (m *Mise) withConfig(
 	ctx context.Context,
 	config *dagger.File,
 ) (*Mise, error) {
@@ -197,31 +201,26 @@ func (m *Mise) WithConfigFile(
 		m.Version = cv.String()
 	}
 
+	return m, nil
+}
+
+func (m *Mise) WithConfig(
+	ctx context.Context,
+	config *dagger.File,
+) (*Mise, error) {
+	m, err := m.withConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	} else if m.Source == nil {
+		m.Source = dag.Directory()
+	}
 	m.Source = m.Source.WithFile("mise.toml", config)
 	return m, nil
 }
 
 func (m *Mise) WithSource(ctx context.Context, source *dagger.Directory) (*Mise, error) {
 	m.Source = source
-	return m.WithConfigFile(ctx, m.Source.File("mise.toml"))
-}
-
-func (m *Mise) Binary(ctx context.Context) (*dagger.File, error) {
-	arch, err := dag.Arch().Microsoft(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return dag.Archive().
-		Untar(
-			dag.HTTP(
-				fmt.Sprintf(
-					"http://github.com/jdx/mise/releases/download/v%s/mise-v%s-linux-%s.tar.gz",
-					m.Version, m.Version, arch,
-				),
-			),
-		).
-		File("mise/bin/mise"), nil
+	return m.withConfig(ctx, source.File("mise.toml"))
 }
 
 func (m *Mise) Container(
@@ -229,45 +228,93 @@ func (m *Mise) Container(
 	// +optional
 	noEnv,
 	// +optional
-	noHooks,
+	noHooks bool,
 	// +optional
-	install bool,
+	tools,
 	// +optional
-	tools []string,
+	include []string,
+	// +optional
+	container *dagger.Container,
 ) (*dagger.Container, error) {
-	mise, err := m.Binary(ctx)
+	lenTools := len(tools)
+
+	if container == nil {
+		// mise's node install has some system dependencies.
+		packages := []string{}
+		var appendPackagesIfHasTool = func(tool string, pkgs ...string) []string {
+			if _, hasTool := m.Config.Tools[tool]; hasTool && (lenTools == 0 || slices.Contains(tools, tool)) {
+				return append(packages, pkgs...)
+			}
+			return packages
+		}
+		packages = appendPackagesIfHasTool("node", "bash", "libatomic", "libstdc++")
+		packages = appendPackagesIfHasTool("go", "gcc")
+		packages = xslices.Unique(packages)
+
+		arch, err := dag.Arch().Microsoft(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		mise := dag.Archive().
+			Untar(
+				dag.HTTP(
+					fmt.Sprintf(
+						"http://github.com/jdx/mise/releases/download/v%s/mise-v%s-linux-%s.tar.gz",
+						m.Version, m.Version, arch,
+					),
+				),
+			).
+			File("mise/bin/mise")
+
+		container = dag.Wolfi().
+			Container(dagger.WolfiContainerOpts{
+				Packages: packages,
+			}).
+			WithEnvVariable("HOME", "/root").
+			WithFile("$HOME/.local/bin/mise", mise, dagger.ContainerWithFileOpts{
+				Expand: true,
+			})
+	}
+
+	miseCacheDir, err := container.WithExec([]string{"mise", "cache", "path"}).Stdout(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	lenTools := len(tools)
-	if lenTools > 0 {
-		install = true
+	container = container.
+		WithMountedCache(miseCacheDir, dag.CacheVolume("mise-cache"), dagger.ContainerWithMountedCacheOpts{
+			Expand: true,
+		})
+
+	miseDataDir, err := container.EnvVariable(ctx, "MISE_DATA_DIR")
+	if err != nil {
+		return nil, err
 	}
 
-	// mise's node install has some system dependencies.
-	packages := []string{}
-	if _, hasNode := m.Config.Tools["node"]; hasNode && (lenTools == 0 || slices.Contains(tools, "node")) {
-		packages = append(packages, "bash", "libatomic", "libstdc++")
+	if miseDataDir == "" {
+		xdgDataHome, err := container.EnvVariable(ctx, "XDG_DATA_HOME")
+		if err != nil {
+			return nil, err
+		} else if xdgDataHome == "" {
+			home, err := container.EnvVariable(ctx, "HOME")
+			if err != nil {
+				return nil, err
+			}
+
+			xdgDataHome = filepath.Join(home, ".local", "share")
+		}
+
+		miseDataDir = filepath.Join(xdgDataHome, "mise")
 	}
 
-	return dag.Wolfi().
-		Container(dagger.WolfiContainerOpts{
-			Packages: packages,
-		}).
-		WithEnvVariable("HOME", "/root").
-		WithMountedCache("$HOME/.local/share/mise", dag.CacheVolume("mise-data"), dagger.ContainerWithMountedCacheOpts{
+	container = container.
+		WithMountedCache(miseDataDir, dag.CacheVolume("mise-data")).
+		WithEnvVariable("PATH", fmt.Sprintf("%s:$HOME/.local/bin:$PATH", filepath.Join(miseDataDir, "shims")), dagger.ContainerWithEnvVariableOpts{
 			Expand: true,
-		}).
-		WithMountedCache("$HOME/.cache/mise", dag.CacheVolume("mise-cache"), dagger.ContainerWithMountedCacheOpts{
-			Expand: true,
-		}).
-		WithEnvVariable("PATH", "$HOME/.local/share/mise/shims:$PATH", dagger.ContainerWithEnvVariableOpts{
-			Expand: true,
-		}).
-		WithFile("/usr/local/bin/mise", mise).
-		WithEnvVariable("MISE_TRUSTED_CONFIG_PATHS", "/src/mise.toml").
-		WithWorkdir("/src").
+		})
+
+	container = container.
 		With(func(r *dagger.Container) *dagger.Container {
 			if noHooks {
 				return r.WithEnvVariable("MISE_NO_HOOKS", "1")
@@ -279,20 +326,39 @@ func (m *Mise) Container(
 				return r.WithEnvVariable("MISE_NO_ENV", "1")
 			}
 			return r
-		}).
+		})
+
+	container = container.
+		WithEnvVariable("MISE_TRUSTED_CONFIG_PATHS", "/src/mise.toml").
+		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
-			if install {
-				include := []string{"mise.toml"}
+			if m.Source != nil {
+				include := append(include, "mise.toml", "mise.*.toml")
 				if !noEnv {
 					include = append(include, m.Config.Env.Underscore.Source...)
 					include = append(include, m.Config.Env.Underscore.Path...)
 				}
+				include = xslices.Unique(include)
 				return r.WithMountedDirectory(".", m.Source.Filter(dagger.DirectoryFilterOpts{
 					Include: include,
 				})).
-					WithExec(append([]string{"mise", "install"}, tools...))
+					WithExec(append([]string{"mise", "install"}, tools...)).
+					WithMountedDirectory(".", m.Source)
 			}
 			return r
-		}).
-		WithMountedDirectory(".", m.Source), nil
+		})
+
+	miseEnv, err := container.WithExec([]string{"mise", "env"}).Stdout(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	envFile := new(strings.Builder)
+	scanner := bufio.NewScanner(strings.NewReader(miseEnv))
+	for scanner.Scan() {
+		fmt.Fprintln(envFile, strings.TrimPrefix(scanner.Text(), "export "))
+	}
+	container = container.WithEnvFileVariables(dag.File(".env", envFile.String()).AsEnvFile())
+
+	return container, nil
 }

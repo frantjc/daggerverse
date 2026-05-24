@@ -294,7 +294,7 @@ func (m *Mise) Container(
 		})
 
 	container = container.
-		WithEnvVariable("MISE_TRUSTED_CONFIG_PATHS", "/src/mise.toml").
+		WithEnvVariable("MISE_YES", "1").
 		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
 			if m.Source != nil {

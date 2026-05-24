@@ -81,10 +81,9 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	container, err = withEnvVariableIfUnset(container, "PATH", "$GOBIN:$PATH")
-	if err != nil {
-		return nil, err
-	}
+	container = container.WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{
+		Expand: true,
+	})
 	container, err = withEnvVariableIfUnset(container, "GOMODCACHE", "$GOPATH/pkg/mod")
 	if err != nil {
 		return nil, err

@@ -143,84 +143,43 @@ type Config struct {
 
 type Mise struct {
 	// +private
-	Version string
-	// +private
 	Source *dagger.Directory
 	// +private
 	Config *Config
 }
 
 func New(
+	ctx context.Context,
+	// +optional
+	// +defaultPath="."
+	source *dagger.Directory,
 	// +optional
 	// +default="2026.5.15"
 	version string,
 ) (*Mise, error) {
-	v, err := semver.NewVersion(version)
-	if err != nil {
-		return nil, err
-	}
-	return &Mise{
-		Version: v.String(),
-		Config: &Config{
-			MinVersion: &ConfigMinVersion{
-				Hard: v.String(),
-			},
+	c := &Config{
+		MinVersion: &ConfigMinVersion{
+			Hard: version,
 		},
+	}
+
+	if source != nil {
+		config := source.File("mise.toml")
+
+		contents, err := config.Contents(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := toml.Unmarshal([]byte(contents), c); err != nil {
+			return nil, err
+		}
+	}
+
+	return &Mise{
+		Config:  c,
+		Source:  source,
 	}, nil
-}
-
-func (m *Mise) withConfig(
-	ctx context.Context,
-	config *dagger.File,
-) (*Mise, error) {
-	contents, err := config.Contents(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := toml.Unmarshal([]byte(contents), m.Config); err != nil {
-		return nil, err
-	}
-
-	v, err := semver.NewVersion(m.Version)
-	if err != nil {
-		return nil, err
-	}
-
-	var cv *semver.Version
-	if m.Config.MinVersion.Hard != "" {
-		if cv, err = semver.NewVersion(m.Config.MinVersion.Hard); err != nil {
-			return nil, err
-		}
-	} else if m.Config.MinVersion.Soft != "" {
-		if cv, err = semver.NewVersion(m.Config.MinVersion.Soft); err != nil {
-			return nil, err
-		}
-	}
-	if cv != nil && v.LessThan(cv) {
-		m.Version = cv.String()
-	}
-
-	return m, nil
-}
-
-func (m *Mise) WithConfig(
-	ctx context.Context,
-	config *dagger.File,
-) (*Mise, error) {
-	m, err := m.withConfig(ctx, config)
-	if err != nil {
-		return nil, err
-	} else if m.Source == nil {
-		m.Source = dag.Directory()
-	}
-	m.Source = m.Source.WithFile("mise.toml", config)
-	return m, nil
-}
-
-func (m *Mise) WithSource(ctx context.Context, source *dagger.Directory) (*Mise, error) {
-	m.Source = source
-	return m.withConfig(ctx, source.File("mise.toml"))
 }
 
 func (m *Mise) Container(
@@ -256,12 +215,17 @@ func (m *Mise) Container(
 			return nil, err
 		}
 
+		version, err := semver.NewVersion(m.Config.MinVersion.Hard)
+		if err != nil {
+			return nil, err
+		}
+
 		mise := dag.Archive().
 			Untar(
 				dag.HTTP(
 					fmt.Sprintf(
 						"http://github.com/jdx/mise/releases/download/v%s/mise-v%s-linux-%s.tar.gz",
-						m.Version, m.Version, arch,
+						version, version, arch,
 					),
 				),
 			).
@@ -284,7 +248,7 @@ func (m *Mise) Container(
 	if err != nil {
 		return nil, err
 	}
-
+	miseCacheDir = strings.TrimSpace(miseCacheDir)
 	container = container.
 		WithMountedCache(miseCacheDir, dag.CacheVolume("mise-cache"), dagger.ContainerWithMountedCacheOpts{
 			Expand: true,
@@ -294,7 +258,6 @@ func (m *Mise) Container(
 	if err != nil {
 		return nil, err
 	}
-
 	if miseDataDir == "" {
 		xdgDataHome, err := container.EnvVariable(ctx, "XDG_DATA_HOME")
 		if err != nil {
@@ -310,7 +273,6 @@ func (m *Mise) Container(
 
 		miseDataDir = filepath.Join(xdgDataHome, "mise")
 	}
-
 	container = container.
 		WithMountedCache(miseDataDir, dag.CacheVolume("mise-data")).
 		WithEnvVariable("PATH", fmt.Sprintf("%s:$PATH", filepath.Join(miseDataDir, "shims")), dagger.ContainerWithEnvVariableOpts{
@@ -362,8 +324,6 @@ func (m *Mise) Container(
 		fmt.Fprintln(envFile, strings.TrimPrefix(scanner.Text(), "export "))
 	}
 	container = container.WithEnvFileVariables(dag.File(".env", envFile.String()).AsEnvFile())
-
-	container = container.WithMountedDirectory(".", m.Source)
 
 	return container, nil
 }

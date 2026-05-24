@@ -106,22 +106,6 @@ func New(
 	return m, nil
 }
 
-func (m *Go) WithServiceBinding(alias string, service *dagger.Service) *Go {
-	return &Go{Container: m.Container.WithServiceBinding(alias, service)}
-}
-
-func (m *Go) WithFile(path string, source *dagger.File) *Go {
-	return &Go{Container: m.Container.WithFile(path, source)}
-}
-
-func (m *Go) WithEnvVariable(name, value string) *Go {
-	return &Go{Container: m.Container.WithEnvVariable(name, value)}
-}
-
-func (m *Go) WithExec(args []string) *Go {
-	return &Go{Container: m.Container.WithExec(args)}
-}
-
 func (m *Go) Build(
 	ctx context.Context,
 	// +optional

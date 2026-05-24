@@ -275,7 +275,7 @@ func (m *Godot) export(
 	}
 	
 	export := container.
-		WithDirectory(fmt.Sprintf("%s/export_templates/%s.%s", xdgDataHome, m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
+		WithDirectory(fmt.Sprintf("%s/godot/export_templates/%s.%s", xdgDataHome, m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
 			Expand: true,
 		}).
 		With(func(r *dagger.Container) *dagger.Container {

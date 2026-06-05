@@ -3,16 +3,14 @@ module github.com/frantjc/daggerverse/dagger-module
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/dagger v0.20.6
 	github.com/dagger/otel-go v1.41.1-0.20260303185236-072f65948887
 	github.com/vektah/gqlparser/v2 v2.5.33
 	go.opentelemetry.io/otel v1.43.0
+	go.opentelemetry.io/otel/sdk v1.42.0
 	go.opentelemetry.io/otel/trace v1.43.0
 )
-
-require go.opentelemetry.io/otel/sdk v1.42.0
 
 replace github.com/dagger/dagger/engine/distconsts => github.com/dagger/dagger/engine/distconsts v0.0.0-20260416025718-220be71b0cc1
 
@@ -23,6 +21,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dagger/dagger/engine/distconsts v0.20.6 // indirect
+	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofrs/flock v0.13.0 // indirect

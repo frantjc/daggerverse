@@ -3,7 +3,6 @@ module github.com/frantjc/daggerverse/forge
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/Khan/genqlient v0.8.1
 	github.com/frantjc/forge v1.0.4
 	github.com/frantjc/x v0.0.0-20251203020658-a4e29ee5477f
@@ -14,9 +13,10 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
-require github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
-
-require go.opentelemetry.io/otel/sdk v1.43.0
+require (
+	github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
+	go.opentelemetry.io/otel/sdk v1.43.0
+)
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
@@ -30,6 +30,7 @@ require (
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
+	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect

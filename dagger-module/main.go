@@ -17,10 +17,6 @@ type DaggerModule struct {
 	Container *dagger.Container
 }
 
-func isGo(moduleConfig *modules.ModuleConfigWithUserFields) bool {
-	return moduleConfig.SDK != nil && moduleConfig.SDK.Source == "go"
-}
-
 func New(
 	ctx context.Context,
 	// +optional
@@ -119,42 +115,6 @@ func (m *DaggerModule) Bump(ctx context.Context) (*dagger.Changeset, error) {
 						ExperimentalPrivilegedNesting: true,
 					},
 				)
-		}
-	}
-
-	if isGo(moduleConfig) {
-		goModulePath := filepath.Join(wd, moduleConfig.Source)
-
-		if exists, err := container.Exists(ctx, goModulePath); err != nil {
-			return nil, err
-		} else if exists {
-			daggerDeveloped := container.
-				WithExec(
-					[]string{"dagger", "develop"},
-					dagger.ContainerWithExecOpts{
-						ExperimentalPrivilegedNesting: true,
-					},
-				).
-				Directory(goModulePath)
-			daggerGoModuleBumped := dag.Go(dagger.GoOpts{
-				Source: daggerDeveloped,
-			}).
-				Container().
-				// NB: This was for Dagger v0.19.11 < version < v0.20.5, which continued to use to SDK v0.19.11.
-				// WithExec([]string{"go", "get", "-u", fmt.Sprintf("dagger.io/dagger@%s", version)}).
-				WithExec([]string{"go", "get", "-u", fmt.Sprintf("github.com/dagger/dagger@%s", version)}).
-				Directory(".")
-			container = container.WithDirectory(
-				goModulePath,
-				container.
-					Directory(goModulePath).
-					WithChanges(
-						dag.Go(dagger.GoOpts{
-							Source: daggerGoModuleBumped,
-						}).
-							Tidy(),
-					),
-			)
 		}
 	}
 

@@ -3,7 +3,6 @@ module github.com/frantjc/daggerverse/mise
 go 1.26.1
 
 require (
-	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/BurntSushi/toml v1.6.0
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
@@ -23,6 +22,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59
 	github.com/frantjc/x v0.0.0-20260522024331-2b0e2e3e0b76
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

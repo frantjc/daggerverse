@@ -199,7 +199,7 @@ func (m *Mise) Container(
 
 	if container == nil {
 		// mise's node install has some system dependencies.
-		packages := []string{}
+		packages := []string{"git"}
 		var appendPackagesIfHasTool = func(tool string, pkgs ...string) []string {
 			if _, hasTool := m.Config.Tools[tool]; hasTool && (lenTools == 0 || slices.Contains(tools, tool)) {
 				return append(packages, pkgs...)

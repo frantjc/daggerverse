@@ -1,8 +1,7 @@
 {
   "name": "arch",
-  "engineVersion": "v0.21.4",
+  "engineVersion": "v0.21.7",
   "sdk": {
     "source": "go"
-  },
-  "source": "."
+  }
 }

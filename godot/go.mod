@@ -1,6 +1,6 @@
 module github.com/logsquaredn/rubber/.dagger/modules/godot
 
-go 1.26.1
+go 1.26.3
 
 require (
 	github.com/Khan/genqlient v0.8.1

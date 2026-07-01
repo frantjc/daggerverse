@@ -1,6 +1,6 @@
 {
   "name": "forge",
-  "engineVersion": "v0.21.4",
+  "engineVersion": "v0.21.7",
   "sdk": {
     "source": "go"
   },
@@ -9,6 +9,5 @@
       "name": "go",
       "source": "../go"
     }
-  ],
-  "source": "."
+  ]
 }

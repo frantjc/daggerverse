@@ -1,6 +1,6 @@
 {
   "name": "mise",
-  "engineVersion": "v0.21.4",
+  "engineVersion": "v0.21.7",
   "sdk": {
     "source": "go"
   },
@@ -15,8 +15,8 @@
     },
     {
       "name": "wolfi",
-      "source": "github.com/dagger/dagger/modules/wolfi@v0.21.4",
-      "pin": "de855952e15728709c99e6bbdc72f70c44d58563"
+      "source": "github.com/dagger/dagger/modules/wolfi@v0.21.7",
+      "pin": "054f94b2d86c0ac00bef11ac4550816973c4aeef"
     }
   ]
 }

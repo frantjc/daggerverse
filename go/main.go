@@ -9,9 +9,7 @@ import (
 	"strings"
 
 	"github.com/frantjc/daggerverse/go/internal/dagger"
-	xstrings "github.com/frantjc/x/strings"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/semver"
 )
 
 type Go struct {
@@ -20,14 +18,15 @@ type Go struct {
 
 func New(
 	ctx context.Context,
+	workspace *dagger.Workspace,
 	// +optional
-	// +defaultPath="."
-	source *dagger.Directory,
-	// +optional
-	version string,
+	// +default="."
+	path string,
 	// +optional
 	container *dagger.Container,
 ) (*Go, error) {
+	source := workspace.Directory(path)
+
 	goMod := source.File("go.mod")
 
 	goModContents, err := goMod.Contents(ctx)
@@ -41,26 +40,10 @@ func New(
 	}
 
 	if container == nil {
-		if version == "" {
-			version = parsedGoMod.Go.Version
-		}
-
-		version = xstrings.EnsurePrefix(version, "v")
-		majorMinor := semver.MajorMinor(version)
-		if majorMinor == "" {
-			majorMinor = strings.TrimPrefix(version, "v")
-		} else {
-			majorMinor = strings.TrimPrefix(majorMinor, "v")
-		}
-
-		container = dag.Wolfi().
-			Container(dagger.WolfiContainerOpts{
-				Packages: []string{"go-" + majorMinor, "gcc"},
-			}).
-			WithEnvVariable("HOME", "/root")
+		container = dag.Container().From(fmt.Sprintf("docker.io/library/golang:%s", parsedGoMod.Go.Version))
 	}
 
-	withEnvVariableIfUnset := func(c *dagger.Container, name, value string, opts ...dagger.ContainerWithEnvVariableOpts) (*dagger.Container, error) {
+	withEnvVariableIfUnset := func(c *dagger.Container, name, value string) (*dagger.Container, error) {
 		existing, err := c.EnvVariable(ctx, name)
 		if err != nil {
 			return nil, err
@@ -164,7 +147,7 @@ func (m *Go) Test(
 	// +optional
 	tags []string,
 ) error {
-	args := []string{"go", "test"}
+	args := []string{"otelgotest"}
 	if race {
 		args = append(args, "-race")
 	}
@@ -179,6 +162,7 @@ func (m *Go) Test(
 			}
 			return c.WithEnvVariable("CGO_ENABLED", "0")
 		}).
+		WithExec([]string{"go", "install", "github.com/dagger/otel-go/cmd/otelgotest@main"}).
 		WithExec(args, dagger.ContainerWithExecOpts{ExperimentalPrivilegedNesting: true}).
 		Sync(ctx)
 	return err
@@ -239,20 +223,6 @@ func (m *Go) Staticcheck(
 func (m *Go) Tidy(ctx context.Context) *dagger.Changeset {
 	return m.Container.
 		WithExec([]string{"go", "mod", "tidy"}).
-		Directory(".").
-		Changes(m.Container.Directory("."))
-}
-
-func (m *Go) UpgradeDirect(ctx context.Context) *dagger.Changeset {
-	return m.Container.
-		WithExec([]string{"go", "get", "-u", "./..."}).
-		Directory(".").
-		Changes(m.Container.Directory("."))
-}
-
-func (m *Go) UpgradeTransitive(ctx context.Context) *dagger.Changeset {
-	return m.Container.
-		WithExec([]string{"go", "get", "-ut", "./..."}).
 		Directory(".").
 		Changes(m.Container.Directory("."))
 }

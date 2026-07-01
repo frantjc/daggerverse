@@ -26,15 +26,16 @@ type EnvVar struct {
 }
 
 func New(
+	workspace *dagger.Workspace,
 	// +optional
-	// +defaultPath="."
-	source *dagger.Directory,
+	// +default="."
+	path string,
 	// +optional
 	// +default=["docker-compose.yml"]
 	files []string,
 ) *Compose {
 	return &Compose{
-		Source: source,
+		Source: workspace.Directory(path),
 		Files:  files,
 	}
 }

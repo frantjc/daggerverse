@@ -157,7 +157,7 @@ type Export struct {
 
 func (m *Godot) ExportRelease(
 	ctx context.Context,
-	source *dagger.Directory,
+	workspace *dagger.Workspace,
 	preset,
 	path,
 	// +optional
@@ -171,12 +171,12 @@ func (m *Godot) ExportRelease(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "release", source, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "release", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func (m *Godot) ExportDebug(
 	ctx context.Context,
-	source *dagger.Directory,
+	workspace *dagger.Workspace,
 	preset,
 	path,
 	// +optional
@@ -190,7 +190,7 @@ func (m *Godot) ExportDebug(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "debug", source, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "debug", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func osslsigncode(

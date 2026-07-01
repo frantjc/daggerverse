@@ -1,6 +1,6 @@
 module github.com/frantjc/daggerverse/dogger/internal/dogger/.dagger
 
-go 1.26.1
+go 1.26.3
 
 require (
 	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72

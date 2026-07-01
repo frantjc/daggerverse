@@ -150,9 +150,10 @@ type Mise struct {
 
 func New(
 	ctx context.Context,
+	workspace *dagger.Workspace,
 	// +optional
-	// +defaultPath="."
-	source *dagger.Directory,
+	// +default="."
+	path string,
 	// +optional
 	// +default="2026.5.15"
 	version string,
@@ -163,8 +164,8 @@ func New(
 		},
 	}
 
-	if source != nil {
-		config := source.File("mise.toml")
+	if workspace != nil {
+		config := workspace.File("mise.toml")
 
 		contents, err := config.Contents(ctx)
 		if err != nil {
@@ -178,7 +179,7 @@ func New(
 
 	return &Mise{
 		Config:  c,
-		Source:  source,
+		Source:  workspace.Directory("."),
 	}, nil
 }
 

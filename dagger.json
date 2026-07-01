@@ -1,21 +1,9 @@
 {
   "name": "daggerverse-dev",
-  "engineVersion": "v0.21.4",
+  "engineVersion": "v0.21.7",
   "sdk": {
     "source": "go"
   },
-  "toolchains": [
-    {
-      "name": "dagger-module",
-      "source": "dagger-module",
-      "customizations": [
-        {
-          "argument": "source",
-          "defaultPath": "."
-        }
-      ]
-    }
-  ],
   "dependencies": [
     {
       "name": "arch",
@@ -52,10 +40,6 @@
     {
       "name": "mise",
       "source": "mise"
-    },
-    {
-      "name": "pki",
-      "source": "pki"
     },
     {
       "name": "release",

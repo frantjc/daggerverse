@@ -127,7 +127,9 @@ func (m *Trivy) Image(
 	// +optional
 	severity,
 	// +optional
-	scanners []string,
+	scanners,
+	// +optional
+	ignoreStatus []string,
 ) error {
 	exec := []string{"trivy", "image"}
 	if len(enableModules) > 0 {
@@ -135,6 +137,21 @@ func (m *Trivy) Image(
 	}
 	if len(severity) > 0 {
 		exec = append(exec, fmt.Sprintf("--severity=%s", strings.Join(severity, ",")))
+	}
+	if len(scanners) > 0 {
+		exec = append(exec, fmt.Sprintf("--scanners=%s", strings.Join(scanners, ",")))
+	}
+	if len(ignoreStatus) > 0 {
+		exec = append(exec, fmt.Sprintf("--ignore-status=%s", strings.Join(ignoreStatus, ",")))
+	}
+	if ignoreUnfixed {
+		exec = append(exec, "--ignore-unfixed")
+	}
+	if disableTelemtry {
+		exec = append(exec, "--disable-telemtry")
+	}
+	if offlineScan {
+		exec = append(exec, "--offline-scan")
 	}
 	name := "image.tar"
 	exec = append(exec, fmt.Sprintf("--input=%s", name))

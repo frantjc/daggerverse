@@ -43,49 +43,57 @@ func New(
 		container = dag.Container().From(fmt.Sprintf("docker.io/library/golang:%s", parsedGoMod.Go.Version))
 	}
 
-	withEnvVariableIfUnset := func(c *dagger.Container, name, value string) (*dagger.Container, error) {
-		existing, err := c.EnvVariable(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		if existing == "" {
-			return c.WithEnvVariable(name, value, dagger.ContainerWithEnvVariableOpts{
+	return &Go{
+		Container: container.
+			With(func(r *dagger.Container) *dagger.Container {
+				if goPath, err := r.EnvVariable(ctx, "GOPATH"); err != nil || goPath != "" {
+					return r
+				}
+
+				return r.WithEnvVariable("GOPATH", "$HOME/go", dagger.ContainerWithEnvVariableOpts{
+					Expand: true,
+				})
+			}).
+			With(func(r *dagger.Container) *dagger.Container {
+				if goBin, err := r.EnvVariable(ctx, "GOBIN"); err != nil || goBin != "" {
+					return r
+				}
+
+				return r.WithEnvVariable("GOBIN", "$GOPATH/bin", dagger.ContainerWithEnvVariableOpts{
+					Expand: true,
+				})
+			}).
+			WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{
 				Expand: true,
-			}), nil
-		}
-		return c, nil
-	}
+			}).
+			With(func(r *dagger.Container) *dagger.Container {
+				if goModCache, err := r.EnvVariable(ctx, "GOMODCACHE"); err != nil || goModCache != "" {
+					return r
+				}
 
-	container, err = withEnvVariableIfUnset(container, "GOPATH", "$HOME/go")
-	if err != nil {
-		return nil, err
-	}
-	container, err = withEnvVariableIfUnset(container, "GOBIN", "$GOPATH/bin")
-	if err != nil {
-		return nil, err
-	}
-	container = container.WithEnvVariable("PATH", "$GOBIN:$PATH", dagger.ContainerWithEnvVariableOpts{
-		Expand: true,
-	})
-	container, err = withEnvVariableIfUnset(container, "GOMODCACHE", "$GOPATH/pkg/mod")
-	if err != nil {
-		return nil, err
-	}
-	container = container.WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true})
-	container, err = withEnvVariableIfUnset(container, "GOCACHE", "$GOPATH/build")
-	if err != nil {
-		return nil, err
-	}
-	container = container.WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{Expand: true})
+				return r.WithEnvVariable("GOMODCACHE", "$GOPATH/pkg/mod", dagger.ContainerWithEnvVariableOpts{
+					Expand: true,
+				})
+			}).
+			WithMountedCache("$GOMODCACHE", dag.CacheVolume("go-mod-cache"), dagger.ContainerWithMountedCacheOpts{
+				Expand: true,
+			}).
+			With(func(r *dagger.Container) *dagger.Container {
+				if goCache, err := r.EnvVariable(ctx, "GOCACHE"); err != nil || goCache != "" {
+					return r
+				}
 
-	m := &Go{container}
-
-	m.Container = m.Container.
-		WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
-		WithMountedDirectory(".", source).
-		WithExec([]string{"go", "mod", "download"})
-
-	return m, nil
+				return r.WithEnvVariable("GOCACHE", "$GOPATH/build", dagger.ContainerWithEnvVariableOpts{
+					Expand: true,
+				})
+			}).
+			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{
+				Expand: true,
+			}).
+			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
+			WithMountedDirectory(".", source).
+			WithExec([]string{"go", "mod", "download"}),
+	}, nil
 }
 
 func (m *Go) Build(

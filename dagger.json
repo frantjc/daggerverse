@@ -42,6 +42,10 @@
       "source": "mise"
     },
     {
+      "name": "trivy",
+      "source": "trivy"
+    },
+    {
       "name": "release",
       "source": "release"
     },

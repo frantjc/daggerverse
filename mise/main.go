@@ -138,6 +138,7 @@ var (
 type Config struct {
 	MinVersion *ConfigMinVersion     `toml:"min_version,omitempty"`
 	Tools      map[string]ConfigTool `toml:"tools,omitempty"`
+	ToolAlias      map[string]string `toml:"tool_alias,omitempty"`
 	Env        ConfigEnv             `toml:"env,omitempty"`
 }
 
@@ -199,16 +200,31 @@ func (m *Mise) Container(
 	lenTools := len(tools)
 
 	if container == nil {
-		// mise's node install has some system dependencies.
+		var usesTool = func(tool string) bool {
+			_, ok := m.Config.Tools[tool]
+			return ok && (lenTools == 0 || slices.Contains(tools, tool))
+		}
+		var usesBackend = func(backend string) bool {
+			for tool := range m.Config.Tools {
+				if _, ok := m.Config.ToolAlias[tool]; ok {
+					tool = m.Config.ToolAlias[tool]
+				}
+				if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
+					return true
+				}
+			}
+			return false
+		}
 		packages := []string{"git"}
-		var appendPackagesIfHasTool = func(tool string, pkgs ...string) []string {
-			if _, hasTool := m.Config.Tools[tool]; hasTool && (lenTools == 0 || slices.Contains(tools, tool)) {
+		var appendPackagesIf = func(cond bool, pkgs ...string) []string {
+			if cond {
 				return append(packages, pkgs...)
 			}
 			return packages
 		}
-		packages = appendPackagesIfHasTool("node", "bash", "libatomic", "libstdc++")
-		packages = appendPackagesIfHasTool("go", "gcc")
+		packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli"), "uv")
+		packages = appendPackagesIf(usesTool("go"), "gcc")
+		packages = appendPackagesIf(usesTool("node"), "bash", "libatomic", "libstdc++")
 		packages = xslices.Unique(packages)
 
 		arch, err := dag.Arch().Microsoft(ctx)

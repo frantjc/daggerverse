@@ -206,16 +206,18 @@ func (m *Mise) Container(
 		}
 		var usesBackend = func(backend string) bool {
 			for tool := range m.Config.Tools {
-				if _, ok := m.Config.ToolAlias[tool]; ok {
-					tool = m.Config.ToolAlias[tool]
-				}
-				if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
-					return true
+				if lenTools == 0 || slices.Contains(tools, tool) {
+					if _, ok := m.Config.ToolAlias[tool]; ok {
+						tool = m.Config.ToolAlias[tool]
+					}
+					if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
+						return true
+					}
 				}
 			}
 			return false
 		}
-		packages := []string{"git"}
+		packages := []string{"git", "bash"}
 		var appendPackagesIf = func(cond bool, pkgs ...string) []string {
 			if cond {
 				return append(packages, pkgs...)
@@ -224,7 +226,7 @@ func (m *Mise) Container(
 		}
 		packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli"), "uv")
 		packages = appendPackagesIf(usesTool("go"), "gcc")
-		packages = appendPackagesIf(usesTool("node"), "bash", "libatomic", "libstdc++")
+		packages = appendPackagesIf(usesTool("node"), "libatomic", "libstdc++")
 		packages = xslices.Unique(packages)
 
 		arch, err := dag.Arch().Microsoft(ctx)
@@ -338,7 +340,12 @@ func (m *Mise) Container(
 	envFile := new(strings.Builder)
 	scanner := bufio.NewScanner(strings.NewReader(miseEnv))
 	for scanner.Scan() {
-		fmt.Fprintln(envFile, strings.TrimPrefix(scanner.Text(), "export "))
+		if _, err = fmt.Fprintln(envFile, strings.TrimPrefix(scanner.Text(), "export ")); err != nil {
+			return nil, err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 	container = container.WithEnvFileVariables(dag.File(".env", envFile.String()).AsEnvFile())
 

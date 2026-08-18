@@ -1,7 +1,8 @@
 [tools]
-azure-cli = { version = "latest", uvx_args = "--prerelease=allow" }
-go = "latest"
-node = "latest"
+azure-cli = { version = "2", uvx_args = "--prerelease=allow" }
+go = "1.26"
+node = "24"
+ansible-core = "2"
 
 [env]
 _.path = ["./node_modules/.bin", "./bin"]

@@ -144,8 +144,6 @@ type Config struct {
 
 type Mise struct {
 	// +private
-	Source *dagger.Directory
-	// +private
 	Config *Config
 }
 
@@ -180,12 +178,12 @@ func New(
 
 	return &Mise{
 		Config:  c,
-		Source:  workspace.Directory("."),
 	}, nil
 }
 
 func (m *Mise) Container(
 	ctx context.Context,
+	workspace *dagger.Workspace,
 	// +optional
 	noEnv,
 	// +optional
@@ -316,18 +314,21 @@ func (m *Mise) Container(
 		WithEnvVariable("MISE_YES", "1").
 		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
-			if m.Source != nil {
+			if workspace != nil {
 				include := append(include, "mise.toml", "mise.*.toml")
 				if !noEnv {
 					include = append(include, m.Config.Env.Underscore.Source...)
 					include = append(include, m.Config.Env.Underscore.Path...)
 				}
 				include = xslices.Unique(include)
-				return r.WithMountedDirectory(".", m.Source.Filter(dagger.DirectoryFilterOpts{
-					Include: include,
-				})).
+				return r.WithMountedDirectory(
+					".",
+					workspace.Directory(".", dagger.WorkspaceDirectoryOpts{
+						Include: include,
+					}),
+				).
 					WithExec(append([]string{"mise", "install"}, tools...)).
-					WithMountedDirectory(".", m.Source)
+					WithMountedDirectory(".", workspace.Directory("."))
 			}
 			return r
 		})
@@ -350,4 +351,33 @@ func (m *Mise) Container(
 	container = container.WithEnvFileVariables(dag.File(".env", envFile.String()).AsEnvFile())
 
 	return container, nil
+}
+
+// +check
+func (m *Mise) Doctor(
+	ctx context.Context,
+	workspace *dagger.Workspace,
+	// +optional
+	noEnv,
+	// +optional
+	noHooks bool,
+	// +optional
+	tools,
+	// +optional
+	include []string,
+	// +optional
+	container *dagger.Container,
+) error {
+	_, err := dag.Mise().
+		Container(dagger.MiseContainerOpts{
+			Workspace: workspace,
+			NoEnv: noEnv,
+			NoHooks: noHooks,
+			Tools: tools,
+			Include: include,
+			Container: container,
+		}).
+		WithExec([]string{"mise", "doctor"}).
+		Sync(ctx)
+	return err
 }

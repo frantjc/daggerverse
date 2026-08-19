@@ -234,3 +234,12 @@ func (m *Go) Tidy(ctx context.Context) *dagger.Changeset {
 		Directory(".").
 		Changes(m.Container.Directory("."))
 }
+
+// +generate
+func (m *Go) Generate(ctx context.Context) *dagger.Changeset {
+	return m.Container.
+		WithExec([]string{"go", "generate", "./..."}).
+		Directory(".").
+		Changes(m.Container.Directory("."))
+}
+

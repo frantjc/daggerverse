@@ -215,7 +215,7 @@ func (m *Mise) Container(
 			}
 			return false
 		}
-		packages := []string{"git", "bash"}
+		packages := []string{"git", "bash", "curl"}
 		var appendPackagesIf = func(cond bool, pkgs ...string) []string {
 			if cond {
 				return append(packages, pkgs...)

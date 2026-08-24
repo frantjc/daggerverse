@@ -215,16 +215,17 @@ func (m *Mise) Container(
 			}
 			return false
 		}
-		packages := []string{"git", "bash", "curl"}
+		packages := []string{"git", "bash"}
 		var appendPackagesIf = func(cond bool, pkgs ...string) []string {
 			if cond {
 				return append(packages, pkgs...)
 			}
 			return packages
 		}
-		packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli"), "uv")
+		packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli") || usesTool("ansible-core"), "uv")
+		packages = appendPackagesIf(usesTool("opentofu"), "curl")
 		packages = appendPackagesIf(usesTool("go"), "gcc")
-		packages = appendPackagesIf(usesTool("node"), "libatomic", "libstdc++")
+		packages = appendPackagesIf(usesTool("node") || usesTool("pnpm"), "libatomic", "libstdc++")
 		packages = xslices.Unique(packages)
 
 		arch, err := dag.Arch().Microsoft(ctx)

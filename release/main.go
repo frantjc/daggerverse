@@ -85,7 +85,6 @@ func (m *Release) Create(
 	data.Description = strings.TrimSpace(description)
 
 	assets := []*dagger.File{}
-	checksumsTxt := new(strings.Builder)
 	upx := dag.Upx()
 	archive := dag.Archive()
 
@@ -163,10 +162,6 @@ func (m *Release) Create(
 
 			checksum, _, _ := strings.Cut(sha256sum, "  ")
 
-			if _, err = fmt.Fprintln(checksumsTxt, file, checksum); err != nil {
-				return err
-			}
-
 			if data.OsArch == nil {
 				data.OsArch = map[string]map[string]tplOsArchData{}
 			}
@@ -191,8 +186,6 @@ func (m *Release) Create(
 			assets = append(assets, asset)
 		}
 	}
-
-	assets = append(assets, dag.File("checksums.txt", checksumsTxt.String()))
 
 	release := gh.Release(githubRepo, data.Version)
 

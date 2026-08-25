@@ -24,7 +24,7 @@ func New(
 	container *dagger.Container,
 ) (*Go, error) {
 	source := workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
-		Include: []string{"go.mod", "go.sum"},
+		Include: []string{"**/go.mod", "**/go.sum"},
 	})
 
 	goMod := source.File("go.mod")

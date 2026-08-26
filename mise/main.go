@@ -180,6 +180,7 @@ func New(
 
 	return &Mise{
 		Config:  c,
+		Src: workspace.Directory("."),
 	}, nil
 }
 

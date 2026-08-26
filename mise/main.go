@@ -191,9 +191,7 @@ func (m *Mise) Container(
 	// +optional
 	noHooks bool,
 	// +optional
-	tools,
-	// +optional
-	include []string,
+	tools []string,
 ) (*dagger.Container, error) {
 	lenTools := len(tools)
 
@@ -313,7 +311,7 @@ func (m *Mise) Container(
 		WithEnvVariable("MISE_YES", "1").
 		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
-			include = append(include, "mise.toml", "mise.*.toml")
+			include := []string{"mise.toml", "mise.*.toml"}
 			if !noEnv {
 				include = append(include, m.Config.Env.Underscore.Source...)
 				include = append(include, m.Config.Env.Underscore.Path...)
@@ -357,9 +355,7 @@ func (m *Mise) Doctor(
 	// +optional
 	noHooks bool,
 	// +optional
-	tools,
-	// +optional
-	include []string,
+	tools []string,
 	// +optional
 	container *dagger.Container,
 ) error {
@@ -367,7 +363,6 @@ func (m *Mise) Doctor(
 		noEnv,
 		noHooks,
 		tools,
-		include,
 	)
 	if err != nil {
 		return err

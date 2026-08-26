@@ -12,7 +12,7 @@ import (
 
 type Go struct {
 	// +private
-	container *dagger.Container
+	Ctr *dagger.Container
 }
 
 func parseGoModFrom(ctx context.Context, goMod *dagger.File) (*modfile.File, error) {
@@ -47,7 +47,7 @@ func New(
 	}
 
 	return &Go{
-		container: container.
+		Ctr: container.
 			With(func(r *dagger.Container) *dagger.Container {
 				if goPath, err := r.EnvVariable(ctx, "GOPATH"); err != nil || goPath != "" {
 					return r
@@ -103,6 +103,7 @@ func New(
 
 func withParsedGoMod(parsedGoMod *modfile.File) func(c *dagger.Container) *dagger.Container {
 	return func(c *dagger.Container) *dagger.Container {
+
 		return c.WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true})
 	}
 }
@@ -126,25 +127,23 @@ func (m *Go) Build(
 	// +optional
 	goos string,
 ) (*dagger.File, error) {
+	container, err := m.Container(ctx, workspace, path)
+	if err != nil {
+		return nil, err
+	}
+
 	output := fmt.Sprintf("$GOBIN/%s", filepath.Base(pkg))
 	if filepath.Ext(pkg) == ".go" {
 		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(filepath.Dir(pkg)))
 	} else if pkg == "./" || pkg == "." {
-		workdir, err := m.container.Workdir(ctx)
+		workdir, err := container.Workdir(ctx)
 		if err != nil {
 			return nil, err
 		}
 		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(workdir))
 	}
 
-	src := workspace.Directory(path)
-
-	parsedGoMod, err := parseGoModFrom(ctx, src.File("go.mod"))
-	if err != nil {
-		return nil, err
-	}
-
-	return m.container.
+	return container.
 		With(func(c *dagger.Container) *dagger.Container {
 			if !cgo {
 				return c.WithEnvVariable("CGO_ENABLED", "0")
@@ -160,8 +159,6 @@ func (m *Go) Build(
 			}
 			return c
 		}).
-		With(withParsedGoMod(parsedGoMod)).
-		WithMountedDirectory(".", workspace.Directory(path)).
 		WithExec([]string{"go", "build", "-trimpath", "-ldflags=" + ldflags, "-o", output, pkg}, dagger.ContainerWithExecOpts{Expand: true}).
 		File(output, dagger.ContainerFileOpts{Expand: true}), nil
 }
@@ -342,7 +339,9 @@ func (m *Go) Generate(
 	}
 
 	return container.
-		WithExec([]string{"go", "generate", pkg}).
+		WithExec([]string{"go", "generate", pkg}, dagger.ContainerWithExecOpts{
+			ExperimentalPrivilegedNesting: true,
+		}).
 		Directory(".").
 		Changes(src), nil
 }
@@ -372,7 +371,7 @@ func (m *Go) containerAndSrc(
 		return nil, nil, err
 	}
 
-	return m.container.
+	return m.Ctr.
 		With(withParsedGoMod(parsedGoMod)).
 		WithMountedDirectory(".", src), src, nil
 }

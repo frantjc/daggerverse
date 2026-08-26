@@ -11,17 +11,7 @@ import (
 )
 
 type Go struct {
-	// +private
-	Ctr *dagger.Container
-}
-
-func parseGoModFrom(ctx context.Context, goMod *dagger.File) (*modfile.File, error) {
-	goModContents, err := goMod.Contents(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return modfile.Parse("go.mod", []byte(goModContents), nil)
+	Container *dagger.Container
 }
 
 func New(
@@ -37,7 +27,14 @@ func New(
 		Include: []string{"**/go.mod", "**/go.sum"},
 	})
 
-	parsedGoMod, err := parseGoModFrom(ctx, src.File("go.mod"))
+	goMod := src.File("go.mod")
+
+	goModContents, err := goMod.Contents(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedGoMod, err := modfile.Parse("go.mod", []byte(goModContents), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +44,7 @@ func New(
 	}
 
 	return &Go{
-		Ctr: container.
+		Container: container.
 			With(func(r *dagger.Container) *dagger.Container {
 				if goPath, err := r.EnvVariable(ctx, "GOPATH"); err != nil || goPath != "" {
 					return r
@@ -93,20 +90,15 @@ func New(
 			WithMountedCache("$GOCACHE", dag.CacheVolume("go-cache"), dagger.ContainerWithMountedCacheOpts{
 				Expand: true,
 			}).
-			WithWorkdir("/src").
+			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", src).
-			WithExec([]string{"go", "mod", "download"}).
-			WithoutMount("."),
+			WithExec([]string{"go", "mod", "download"}),
 	}, nil
 }
 
 
 func (m *Go) Build(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./"
 	pkg string,
@@ -120,23 +112,18 @@ func (m *Go) Build(
 	// +optional
 	goos string,
 ) (*dagger.File, error) {
-	container, err := m.Container(workspace, path)
-	if err != nil {
-		return nil, err
-	}
-
 	output := fmt.Sprintf("$GOBIN/%s", filepath.Base(pkg))
 	if filepath.Ext(pkg) == ".go" {
 		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(filepath.Dir(pkg)))
 	} else if pkg == "./" || pkg == "." {
-		workdir, err := container.Workdir(ctx)
+		workdir, err := m.Container.Workdir(ctx)
 		if err != nil {
 			return nil, err
 		}
 		output = fmt.Sprintf("$GOBIN/%s", filepath.Base(workdir))
 	}
 
-	return container.
+	return m.Container.
 		With(func(c *dagger.Container) *dagger.Container {
 			if !cgo {
 				return c.WithEnvVariable("CGO_ENABLED", "0")
@@ -182,12 +169,7 @@ func (m *Go) Test(
 	}
 	args = append(args, pkg)
 
-	container, err := m.Container(workspace, path)
-	if err != nil {
-		return err
-	}
-
-	_, err = container.
+	_, err := m.Container.
 		With(func(c *dagger.Container) *dagger.Container {
 			if cgo || race {
 				return c.WithEnvVariable("CGO_ENABLED", "1")
@@ -203,32 +185,19 @@ func (m *Go) Test(
 // +generate
 func (m *Go) Fmt(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,
 ) (*dagger.Changeset, error) {
-	container, src, err := m.containerAndSrc(workspace, path)
-	if err != nil {
-		return nil, err
-	}
-
-	return container.
+	return m.Container.
 		WithExec([]string{"go", "fmt", pkg}).
 		Directory(".").
-		Changes(src), nil
+		Changes(m.Container.Directory(".")), nil
 }
 
 // +check
 func (m *Go) Vulncheck(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,
@@ -236,12 +205,7 @@ func (m *Go) Vulncheck(
 	// +default="latest"
 	version string,
 ) error {
-	container, err := m.Container(workspace, path)
-	if err != nil {
-		return err
-	}
-
-	_, err = container.
+	_, err := m.Container.
 		WithExec([]string{"go", "install", fmt.Sprintf("golang.org/x/vuln/cmd/govulncheck@%s", version)}).
 		WithExec([]string{"govulncheck", pkg}).
 		Sync(ctx)
@@ -251,20 +215,11 @@ func (m *Go) Vulncheck(
 // +check
 func (m *Go) Vet(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,
 ) error {
-	container, err := m.Container(workspace, path)
-	if err != nil {
-		return err
-	}
-
-	_, err = container.
+	_, err := m.Container.
 		WithExec([]string{"go", "vet", pkg}).
 		Sync(ctx)
 	return err
@@ -273,10 +228,6 @@ func (m *Go) Vet(
 // +check
 func (m *Go) Staticcheck(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,
@@ -284,12 +235,7 @@ func (m *Go) Staticcheck(
 	// +default="latest"
 	version string,
 ) error {
-	container, err := m.Container(workspace, path)
-	if err != nil {
-		return err
-	}
-
-	_, err = container.
+	_, err := m.Container.
 		WithExec([]string{"go", "install", fmt.Sprintf("honnef.co/go/tools/cmd/staticcheck@%s", version)}).
 		WithExec([]string{"staticcheck", pkg}).
 		Sync(ctx)
@@ -304,57 +250,23 @@ func (m *Go) Tidy(
 	// +default="."
 	path string,
 ) (*dagger.Changeset, error) {
-	container, src, err := m.containerAndSrc(workspace, path)
-	if err != nil {
-		return nil, err
-	}
-
-	return container.
+	return m.Container.
 		WithExec([]string{"go", "mod", "tidy"}).
 		Directory(".").
-		Changes(src), nil
+		Changes(m.Container.Directory(".")), nil
 }
 
 // +generate
 func (m *Go) Generate(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,
 ) (*dagger.Changeset, error) {
-	container, src, err := m.containerAndSrc(workspace, path)
-	if err != nil {
-		return nil, err
-	}
-
-	return container.
+	return m.Container.
 		WithExec([]string{"go", "generate", pkg}, dagger.ContainerWithExecOpts{
 			ExperimentalPrivilegedNesting: true,
 		}).
 		Directory(".").
-		Changes(src), nil
-}
-
-func (m *Go) Container(
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
-) (*dagger.Container, error) {
-	container, _, err := m.containerAndSrc(workspace, path)
-	return container, err
-}
-
-func (m *Go) containerAndSrc(
-	workspace *dagger.Workspace,
-	path string,
-) (*dagger.Container, *dagger.Directory, error) {
-	src := workspace.Directory(path)
-
-	return m.Ctr.
-		WithMountedDirectory(".", src), src, nil
+		Changes(m.Container.Directory(".")), nil
 }

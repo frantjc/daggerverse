@@ -145,6 +145,8 @@ type Config struct {
 type Mise struct {
 	// +private
 	Config *Config
+	// +private
+	Src *dagger.Directory
 }
 
 func New(
@@ -183,7 +185,6 @@ func New(
 
 func (m *Mise) Container(
 	ctx context.Context,
-	workspace *dagger.Workspace,
 	// +optional
 	noEnv,
 	// +optional
@@ -192,75 +193,71 @@ func (m *Mise) Container(
 	tools,
 	// +optional
 	include []string,
-	// +optional
-	container *dagger.Container,
 ) (*dagger.Container, error) {
 	lenTools := len(tools)
 
-	if container == nil {
-		var usesTool = func(tool string) bool {
-			_, ok := m.Config.Tools[tool]
-			return ok && (lenTools == 0 || slices.Contains(tools, tool))
-		}
-		var usesBackend = func(backend string) bool {
-			for tool := range m.Config.Tools {
-				if lenTools == 0 || slices.Contains(tools, tool) {
-					if _, ok := m.Config.ToolAlias[tool]; ok {
-						tool = m.Config.ToolAlias[tool]
-					}
-					if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
-						return true
-					}
+	var usesTool = func(tool string) bool {
+		_, ok := m.Config.Tools[tool]
+		return ok && (lenTools == 0 || slices.Contains(tools, tool))
+	}
+	var usesBackend = func(backend string) bool {
+		for tool := range m.Config.Tools {
+			if lenTools == 0 || slices.Contains(tools, tool) {
+				if _, ok := m.Config.ToolAlias[tool]; ok {
+					tool = m.Config.ToolAlias[tool]
+				}
+				if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
+					return true
 				}
 			}
-			return false
 		}
-		packages := []string{"git", "bash"}
-		var appendPackagesIf = func(cond bool, pkgs ...string) []string {
-			if cond {
-				return append(packages, pkgs...)
-			}
-			return packages
-		}
-		packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli") || usesTool("ansible-core"), "uv")
-		packages = appendPackagesIf(usesTool("opentofu"), "curl")
-		packages = appendPackagesIf(usesTool("go"), "gcc")
-		packages = appendPackagesIf(usesTool("node") || usesTool("pnpm"), "libatomic", "libstdc++")
-		packages = xslices.Unique(packages)
-
-		arch, err := dag.Arch().Microsoft(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		version, err := semver.NewVersion(m.Config.MinVersion.Hard)
-		if err != nil {
-			return nil, err
-		}
-
-		mise := dag.Archive().
-			Untar(
-				dag.HTTP(
-					fmt.Sprintf(
-						"http://github.com/jdx/mise/releases/download/v%s/mise-v%s-linux-%s.tar.gz",
-						version, version, arch,
-					),
-				),
-			).
-			File("mise/bin/mise")
-
-		container = dag.Wolfi().
-			Container(dagger.WolfiContainerOpts{
-				Packages: packages,
-			}).
-			WithEnvVariable("HOME", "/root").
-			WithEnvVariable("PATH", "$HOME/.local/bin:$PATH", dagger.ContainerWithEnvVariableOpts{
-				Expand: true,
-			}).
-			WithFile("$HOME/.local/bin/mise", mise, dagger.ContainerWithFileOpts{
-				Expand: true,
-			})
+		return false
 	}
+	packages := []string{"git", "bash"}
+	var appendPackagesIf = func(cond bool, pkgs ...string) []string {
+		if cond {
+			return append(packages, pkgs...)
+		}
+		return packages
+	}
+	packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli") || usesTool("ansible-core"), "uv")
+	packages = appendPackagesIf(usesTool("opentofu"), "curl")
+	packages = appendPackagesIf(usesTool("go"), "gcc")
+	packages = appendPackagesIf(usesTool("node") || usesTool("pnpm"), "libatomic", "libstdc++")
+	packages = xslices.Unique(packages)
+
+	arch, err := dag.Arch().Microsoft(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := semver.NewVersion(m.Config.MinVersion.Hard)
+	if err != nil {
+		return nil, err
+	}
+
+	mise := dag.Archive().
+		Untar(
+			dag.HTTP(
+				fmt.Sprintf(
+					"http://github.com/jdx/mise/releases/download/v%s/mise-v%s-linux-%s.tar.gz",
+					version, version, arch,
+				),
+			),
+		).
+		File("mise/bin/mise")
+
+	container := dag.Wolfi().
+		Container(dagger.WolfiContainerOpts{
+			Packages: packages,
+		}).
+		WithEnvVariable("HOME", "/root").
+		WithEnvVariable("PATH", "$HOME/.local/bin:$PATH", dagger.ContainerWithEnvVariableOpts{
+			Expand: true,
+		}).
+		WithFile("$HOME/.local/bin/mise", mise, dagger.ContainerWithFileOpts{
+			Expand: true,
+		})
 
 	miseCacheDir, err := container.WithExec([]string{"mise", "cache", "path"}).Stdout(ctx)
 	if err != nil {
@@ -315,23 +312,20 @@ func (m *Mise) Container(
 		WithEnvVariable("MISE_YES", "1").
 		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
-			if workspace != nil {
-				include := append(include, "mise.toml", "mise.*.toml")
-				if !noEnv {
-					include = append(include, m.Config.Env.Underscore.Source...)
-					include = append(include, m.Config.Env.Underscore.Path...)
-				}
-				include = xslices.Unique(include)
-				return r.WithMountedDirectory(
-					".",
-					workspace.Directory(".", dagger.WorkspaceDirectoryOpts{
-						Include: include,
-					}),
-				).
-					WithExec(append([]string{"mise", "install"}, tools...)).
-					WithMountedDirectory(".", workspace.Directory("."))
+			include = append(include, "mise.toml", "mise.*.toml")
+			if !noEnv {
+				include = append(include, m.Config.Env.Underscore.Source...)
+				include = append(include, m.Config.Env.Underscore.Path...)
 			}
-			return r
+			include = xslices.Unique(include)
+			return r.WithMountedDirectory(
+				".",
+				m.Src.Filter(dagger.DirectoryFilterOpts{
+					Include: include,
+				}),
+			).
+				WithExec(append([]string{"mise", "install"}, tools...)).
+				WithMountedDirectory(".", m.Src)
 		})
 
 	miseEnv, err := container.WithExec([]string{"mise", "env"}).Stdout(ctx)
@@ -357,7 +351,6 @@ func (m *Mise) Container(
 // +check
 func (m *Mise) Doctor(
 	ctx context.Context,
-	workspace *dagger.Workspace,
 	// +optional
 	noEnv,
 	// +optional
@@ -369,15 +362,16 @@ func (m *Mise) Doctor(
 	// +optional
 	container *dagger.Container,
 ) error {
-	_, err := dag.Mise().
-		Container(dagger.MiseContainerOpts{
-			Workspace: workspace,
-			NoEnv: noEnv,
-			NoHooks: noHooks,
-			Tools: tools,
-			Include: include,
-			Container: container,
-		}).
+	container, err := m.Container(ctx,
+		noEnv,
+		noHooks,
+		tools,
+		include,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = container.
 		WithExec([]string{"mise", "doctor"}).
 		Sync(ctx)
 	return err

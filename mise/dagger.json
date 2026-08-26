@@ -2,10 +2,7 @@
   "name": "mise",
   "engineVersion": "v0.21.7",
   "sdk": {
-    "source": "go",
-    "experimental": {
-      "SELF_CALLS": true
-    }
+    "source": "go"
   },
   "dependencies": [
     {

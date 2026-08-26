@@ -346,7 +346,6 @@ func (m *Go) Generate(
 		Changes(src), nil
 }
 
-// +generate
 func (m *Go) Container(
 	ctx context.Context,
 	workspace *dagger.Workspace,

@@ -1,0 +1,38 @@
+[modules.dagger-go-sdk]
+source = "github.com/dagger/go-sdk"
+
+[modules.dagger-go-sdk.as-sdk]
+name = "go"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "arch"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "archive"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "controller-gen"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "gh"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "go"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "godot"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "kwok"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "mise"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "release"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "trivy"
+
+[[modules.dagger-go-sdk.as-sdk.modules]]
+path = "upx"

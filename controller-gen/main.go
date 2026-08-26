@@ -25,8 +25,7 @@ func New(
 	version string,
 ) (*ControllerGen, error) {
 	if container == nil {
-		container = dag.Go(dagger.GoOpts{
-			Workspace: workspace,
+		container = dag.Go(workspace, dagger.GoOpts{
 			Path:      path,
 		}).
 			Container()

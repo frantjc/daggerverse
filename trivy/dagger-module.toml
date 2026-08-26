@@ -1,0 +1,5 @@
+name = "trivy"
+engineVersion = "v0.21.7"
+
+[runtime]
+  source = "go"

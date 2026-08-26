@@ -25,10 +25,14 @@ func New(
 			Workspace: workspace,
 			Path:      path,
 		}).
-			Container().
-			WithExec([]string{"go", "install", "sigs.k8s.io/controller-tools/cmd/controller-gen"})
+			Container(dagger.GoContainerOpts{
+				Workspace: workspace,
+				Path:      path,
+			}).
+			WithExec([]string{"go", "install", "sigs.k8s.io/controller-tools/cmd/controller-gen"}).
+			WithoutMount(".")
 	}
-	return &ControllerGen{container}
+	return &ControllerGen{container.WithWorkdir("/src")}
 }
 
 // +generate

@@ -69,7 +69,7 @@ func (c *ControllerGen) RBAC(
 	// +default="config/rbac"
 	output string,
 ) *dagger.Changeset {
-	args := []string{"controller-gen", "rbac", fmt.Sprintf("rbac:roleName=%s", roleName), fmt.Sprintf("output:rbac:artifacts:config=%s", output)}
+	args := []string{"controller-gen", fmt.Sprintf("rbac:roleName=%s", roleName), fmt.Sprintf("output:rbac:artifacts:config=%s", output)}
 	for _, path := range paths {
 		args = append(args, fmt.Sprintf("paths=%s", path))
 	}

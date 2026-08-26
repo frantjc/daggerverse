@@ -92,7 +92,8 @@ func New(
 			}).
 			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", src).
-			WithExec([]string{"go", "mod", "download"}),
+			WithExec([]string{"go", "mod", "download"}).
+			WithMountedDirectory(".", workspace.Directory(path)),
 	}, nil
 }
 

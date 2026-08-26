@@ -26,7 +26,7 @@ func New(
 			Path:      path,
 		}).
 			Container().
-			WithExec([]string{"go install", "sigs.k8s.io/controller-tools/cmd/controller-gen"})
+			WithExec([]string{"go", "install", "sigs.k8s.io/controller-tools/cmd/controller-gen"})
 	}
 	return &ControllerGen{container}
 }

@@ -39,8 +39,8 @@ type ControllerGenCrdOpts struct {
 	Output string
 }
 
-func (r *ControllerGen) Crd(workspace *Workspace, opts ...ControllerGenCrdOpts) *Changeset {
-	assertNotNil("workspace", workspace)
+func (r *ControllerGen) Crd(ws *Workspace, opts ...ControllerGenCrdOpts) *Changeset {
+	assertNotNil("ws", ws)
 	q := r.query.Select("crd")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `paths` optional argument
@@ -52,7 +52,7 @@ func (r *ControllerGen) Crd(workspace *Workspace, opts ...ControllerGenCrdOpts) 
 			q = q.Arg("output", opts[i].Output)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Changeset{
 		query: q,
@@ -176,8 +176,8 @@ type ControllerGenOpts struct {
 	Version string
 }
 
-func (r *Query) ControllerGen(workspace *Workspace, opts ...ControllerGenOpts) *ControllerGen { // controller-gen (../../../:0:0)
-	assertNotNil("workspace", workspace)
+func (r *Query) ControllerGen(ws *Workspace, opts ...ControllerGenOpts) *ControllerGen { // controller-gen (../../../:0:0)
+	assertNotNil("ws", ws)
 	q := r.query.Select("controllerGen")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -193,7 +193,7 @@ func (r *Query) ControllerGen(workspace *Workspace, opts ...ControllerGenOpts) *
 			q = q.Arg("version", opts[i].Version)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &ControllerGen{
 		query: q,

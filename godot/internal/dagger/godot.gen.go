@@ -42,8 +42,8 @@ type GodotExportDebugOpts struct {
 	WindowsCodesignPassword *Secret
 }
 
-func (r *Godot) ExportDebug(workspace *Workspace, preset string, path string, opts ...GodotExportDebugOpts) *GodotExport {
-	assertNotNil("workspace", workspace)
+func (r *Godot) ExportDebug(src *Directory, preset string, path string, opts ...GodotExportDebugOpts) *GodotExport {
+	assertNotNil("src", src)
 	q := r.query.Select("exportDebug")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `osslsigncodeVersion` optional argument
@@ -67,7 +67,7 @@ func (r *Godot) ExportDebug(workspace *Workspace, preset string, path string, op
 			q = q.Arg("windowsCodesignPassword", opts[i].WindowsCodesignPassword)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("src", src)
 	q = q.Arg("preset", preset)
 	q = q.Arg("path", path)
 
@@ -89,8 +89,8 @@ type GodotExportReleaseOpts struct {
 	WindowsCodesignPassword *Secret
 }
 
-func (r *Godot) ExportRelease(workspace *Workspace, preset string, path string, opts ...GodotExportReleaseOpts) *GodotExport {
-	assertNotNil("workspace", workspace)
+func (r *Godot) ExportRelease(src *Directory, preset string, path string, opts ...GodotExportReleaseOpts) *GodotExport {
+	assertNotNil("src", src)
 	q := r.query.Select("exportRelease")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `osslsigncodeVersion` optional argument
@@ -114,7 +114,7 @@ func (r *Godot) ExportRelease(workspace *Workspace, preset string, path string, 
 			q = q.Arg("windowsCodesignPassword", opts[i].WindowsCodesignPassword)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("src", src)
 	q = q.Arg("preset", preset)
 	q = q.Arg("path", path)
 

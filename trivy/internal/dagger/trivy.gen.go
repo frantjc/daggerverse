@@ -192,8 +192,8 @@ type TrivyRepoOpts struct {
 	IgnoreStatus []string
 }
 
-func (r *Trivy) Repo(ctx context.Context, workspace *Workspace, opts ...TrivyRepoOpts) error {
-	assertNotNil("workspace", workspace)
+func (r *Trivy) Repo(ctx context.Context, ws *Workspace, opts ...TrivyRepoOpts) error {
+	assertNotNil("ws", ws)
 	if r.repo != nil {
 		return nil
 	}
@@ -236,7 +236,7 @@ func (r *Trivy) Repo(ctx context.Context, workspace *Workspace, opts ...TrivyRep
 			q = q.Arg("ignoreStatus", opts[i].IgnoreStatus)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return q.Execute(ctx)
 }

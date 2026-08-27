@@ -215,8 +215,8 @@ type GoTestOpts struct {
 	Tags []string
 }
 
-func (r *Go) Test(ctx context.Context, workspace *Workspace, opts ...GoTestOpts) error {
-	assertNotNil("workspace", workspace)
+func (r *Go) Test(ctx context.Context, ws *Workspace, opts ...GoTestOpts) error {
+	assertNotNil("ws", ws)
 	if r.test != nil {
 		return nil
 	}
@@ -243,7 +243,7 @@ func (r *Go) Test(ctx context.Context, workspace *Workspace, opts ...GoTestOpts)
 			q = q.Arg("tags", opts[i].Tags)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return q.Execute(ctx)
 }
@@ -255,8 +255,8 @@ type GoTidyOpts struct {
 	Path string
 }
 
-func (r *Go) Tidy(workspace *Workspace, opts ...GoTidyOpts) *Changeset {
-	assertNotNil("workspace", workspace)
+func (r *Go) Tidy(ws *Workspace, opts ...GoTidyOpts) *Changeset {
+	assertNotNil("ws", ws)
 	q := r.query.Select("tidy")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -264,7 +264,7 @@ func (r *Go) Tidy(workspace *Workspace, opts ...GoTidyOpts) *Changeset {
 			q = q.Arg("path", opts[i].Path)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Changeset{
 		query: q,
@@ -331,8 +331,8 @@ type GoOpts struct {
 	Container *Container
 }
 
-func (r *Query) Go(workspace *Workspace, opts ...GoOpts) *Go { // go (../../../:0:0)
-	assertNotNil("workspace", workspace)
+func (r *Query) Go(ws *Workspace, opts ...GoOpts) *Go { // go (../../../:0:0)
+	assertNotNil("ws", ws)
 	q := r.query.Select("go")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -344,7 +344,7 @@ func (r *Query) Go(workspace *Workspace, opts ...GoOpts) *Go { // go (../../../:
 			q = q.Arg("container", opts[i].Container)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Go{
 		query: q,

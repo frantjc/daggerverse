@@ -60,7 +60,7 @@ func New(
 // +check
 func (m *Trivy) Repo(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
@@ -105,7 +105,7 @@ func (m *Trivy) Repo(
 	}
 	exec = append(exec, ".")
 	_, err := m.Container.
-		WithMountedDirectory(".", workspace.Directory(path)).
+		WithMountedDirectory(".", ws.Directory(path)).
 		WithExec(exec).
 		Sync(ctx)
 	return err
@@ -155,7 +155,7 @@ func (m *Trivy) Image(
 	}
 	name := "image.tar"
 	exec = append(exec, fmt.Sprintf("--input=%s", name))
-	
+
 	_, err := m.Container.
 		WithMountedFile(name, container.AsTarball().WithName(name)).
 		WithExec(exec).

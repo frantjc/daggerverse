@@ -7,7 +7,7 @@ A Dagger module for exporting [Godot Engine](https://godotengine.org/) projects.
 Export a Godot project using the "Linux/X11" preset:
 
 ```sh
-dagger call -m github.com/frantjc/daggerverse/godot --src . export-release --preset "Linux/X11" --path mygame binary export --path mygame
+dagger api call -m github.com/frantjc/daggerverse/godot --src . export-release --preset "Linux/X11" --path mygame binary export --path mygame
 ```
 
 The preset name must exactly match an entry in your project's `export_presets.cfg`. Available presets are listed in the error message if the name is not found.

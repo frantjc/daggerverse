@@ -240,11 +240,11 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var workspace *dagger.Workspace
-			if inputArgs["workspace"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["workspace"]), &workspace)
+			var src *dagger.Directory
+			if inputArgs["src"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["src"]), &src)
 				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg workspace", err))
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg src", err))
 				}
 			}
 			var preset string
@@ -296,18 +296,18 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg windowsCodesignPassword", err))
 				}
 			}
-			return (*Godot).ExportDebug(&parent, ctx, workspace, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+			return (*Godot).ExportDebug(&parent, ctx, src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 		case "ExportRelease":
 			var parent Godot
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var workspace *dagger.Workspace
-			if inputArgs["workspace"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["workspace"]), &workspace)
+			var src *dagger.Directory
+			if inputArgs["src"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["src"]), &src)
 				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg workspace", err))
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg src", err))
 				}
 			}
 			var preset string
@@ -359,7 +359,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg windowsCodesignPassword", err))
 				}
 			}
-			return (*Godot).ExportRelease(&parent, ctx, workspace, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+			return (*Godot).ExportRelease(&parent, ctx, src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 		case "":
 			var parent Godot
 			err = json.Unmarshal(parentJSON, &parent)
@@ -399,7 +399,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("ExportDebug",
 							dag.TypeDef().WithObject("Export")).
 							WithSourceMap(dag.SourceMap("main.go", 177, 1)).
-							WithArg("workspace", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 179, 2)}).
+							WithArg("src", dag.TypeDef().WithObject("Directory"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 179, 2)}).
 							WithArg("preset", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 180, 2)}).
 							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 181, 2)}).
 							WithArg("osslsigncodeVersion", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 183, 2)}).
@@ -411,7 +411,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("ExportRelease",
 							dag.TypeDef().WithObject("Export")).
 							WithSourceMap(dag.SourceMap("main.go", 158, 1)).
-							WithArg("workspace", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 160, 2)}).
+							WithArg("src", dag.TypeDef().WithObject("Directory"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 160, 2)}).
 							WithArg("preset", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 161, 2)}).
 							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 162, 2)}).
 							WithArg("osslsigncodeVersion", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 164, 2)}).

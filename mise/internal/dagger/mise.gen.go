@@ -150,8 +150,8 @@ type MiseOpts struct {
 	Version string
 }
 
-func (r *Query) Mise(workspace *Workspace, opts ...MiseOpts) *Mise { // mise (../../../:0:0)
-	assertNotNil("workspace", workspace)
+func (r *Query) Mise(ws *Workspace, opts ...MiseOpts) *Mise { // mise (../../../:0:0)
+	assertNotNil("ws", ws)
 	q := r.query.Select("mise")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -163,7 +163,7 @@ func (r *Query) Mise(workspace *Workspace, opts ...MiseOpts) *Mise { // mise (..
 			q = q.Arg("version", opts[i].Version)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Mise{
 		query: q,

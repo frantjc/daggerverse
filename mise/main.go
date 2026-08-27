@@ -138,7 +138,7 @@ var (
 type Config struct {
 	MinVersion *ConfigMinVersion     `toml:"min_version,omitempty"`
 	Tools      map[string]ConfigTool `toml:"tools,omitempty"`
-	ToolAlias      map[string]string `toml:"tool_alias,omitempty"`
+	ToolAlias  map[string]string     `toml:"tool_alias,omitempty"`
 	Env        ConfigEnv             `toml:"env,omitempty"`
 }
 
@@ -151,7 +151,7 @@ type Mise struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
@@ -165,8 +165,8 @@ func New(
 		},
 	}
 
-	if workspace != nil {
-		config := workspace.File("mise.toml")
+	if ws != nil {
+		config := ws.Directory(path).File("mise.toml")
 
 		contents, err := config.Contents(ctx)
 		if err != nil {
@@ -179,8 +179,8 @@ func New(
 	}
 
 	return &Mise{
-		Config:  c,
-		Src: workspace.Directory("."),
+		Config: c,
+		Src:    ws.Directory(path),
 	}, nil
 }
 

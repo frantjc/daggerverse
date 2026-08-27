@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/mod/modfile"
 	"github.com/frantjc/daggerverse/go/internal/dagger"
+	"golang.org/x/mod/modfile"
 )
 
 type ControllerGen struct {
@@ -14,7 +14,7 @@ type ControllerGen struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
@@ -25,8 +25,8 @@ func New(
 	version string,
 ) (*ControllerGen, error) {
 	if container == nil {
-		container = dag.Go(workspace, dagger.GoOpts{
-			Path:      path,
+		container = dag.Go(ws, dagger.GoOpts{
+			Path: path,
 		}).
 			Container()
 
@@ -60,7 +60,7 @@ func New(
 	return &ControllerGen{
 		Container: container.
 			WithWorkdir("/src").
-			WithMountedDirectory(".", workspace.Directory(path)),
+			WithMountedDirectory(".", ws.Directory(path)),
 	}, nil
 }
 
@@ -107,7 +107,7 @@ func (c *ControllerGen) RBAC(
 // +generate
 func (c *ControllerGen) CRD(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default=["./..."]
 	paths []string,

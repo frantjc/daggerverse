@@ -157,7 +157,7 @@ type Export struct {
 
 func (m *Godot) ExportRelease(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	src *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -171,12 +171,12 @@ func (m *Godot) ExportRelease(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "release", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "release", src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func (m *Godot) ExportDebug(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	src *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -190,7 +190,7 @@ func (m *Godot) ExportDebug(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "debug", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "debug", src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func osslsigncode(
@@ -261,7 +261,6 @@ func (m *Godot) export(
 
 	embedPck, _ := strconv.ParseBool(options.Key("binary_format/embed_pck").Value())
 
-
 	xdgDataHome, err := container.EnvVariable(ctx, "XDG_DATA_HOME")
 	if err != nil {
 		return nil, err
@@ -273,7 +272,7 @@ func (m *Godot) export(
 
 		xdgDataHome = filepath.Join(home, ".local", "share")
 	}
-	
+
 	export := container.
 		WithDirectory(fmt.Sprintf("%s/godot/export_templates/%s.%s", xdgDataHome, m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
 			Expand: true,

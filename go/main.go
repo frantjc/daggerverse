@@ -16,14 +16,14 @@ type Go struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
 	// +optional
 	container *dagger.Container,
 ) (*Go, error) {
-	src := workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+	src := ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 		Include: []string{"**/go.mod", "**/go.sum"},
 	})
 
@@ -93,10 +93,9 @@ func New(
 			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", src).
 			WithExec([]string{"go", "mod", "download"}).
-			WithMountedDirectory(".", workspace.Directory(path)),
+			WithMountedDirectory(".", ws.Directory(path)),
 	}, nil
 }
-
 
 func (m *Go) Build(
 	ctx context.Context,
@@ -147,7 +146,7 @@ func (m *Go) Build(
 // +check
 func (m *Go) Test(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
@@ -246,7 +245,7 @@ func (m *Go) Staticcheck(
 // +generate
 func (m *Go) Tidy(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,

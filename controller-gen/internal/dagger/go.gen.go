@@ -29,19 +29,19 @@ func (r *Go) WithGraphQLQuery(q *querybuilder.Selection) *Go {
 type GoBuildOpts struct {
 
 	// Default: "./"
-	Pkg string // go (../../../go/main.go:105:2)
+	Pkg string // go (../../../go/main.go:104:2)
 
 	// Default: "-s -w"
-	Ldflags string // go (../../../go/main.go:108:2)
+	Ldflags string // go (../../../go/main.go:107:2)
 
-	Cgo bool // go (../../../go/main.go:110:2)
+	Cgo bool // go (../../../go/main.go:109:2)
 
-	Goarch string // go (../../../go/main.go:112:2)
+	Goarch string // go (../../../go/main.go:111:2)
 
-	Goos string // go (../../../go/main.go:114:2)
+	Goos string // go (../../../go/main.go:113:2)
 }
 
-func (r *Go) Build(opts ...GoBuildOpts) *File { // go (../../../go/main.go:101:1)
+func (r *Go) Build(opts ...GoBuildOpts) *File { // go (../../../go/main.go:100:1)
 	q := r.query.Select("build")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `pkg` optional argument
@@ -83,10 +83,10 @@ func (r *Go) Container() *Container { // go (../../../go/main.go:14:2)
 type GoFmtOpts struct {
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:191:2)
+	Pkg string // go (../../../go/main.go:190:2)
 }
 
-func (r *Go) Fmt(opts ...GoFmtOpts) *Changeset { // go (../../../go/main.go:187:1)
+func (r *Go) Fmt(opts ...GoFmtOpts) *Changeset { // go (../../../go/main.go:186:1)
 	q := r.query.Select("fmt")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `pkg` optional argument
@@ -104,10 +104,10 @@ func (r *Go) Fmt(opts ...GoFmtOpts) *Changeset { // go (../../../go/main.go:187:
 type GoGenerateOpts struct {
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:265:2)
+	Pkg string // go (../../../go/main.go:264:2)
 }
 
-func (r *Go) Generate(opts ...GoGenerateOpts) *Changeset { // go (../../../go/main.go:261:1)
+func (r *Go) Generate(opts ...GoGenerateOpts) *Changeset { // go (../../../go/main.go:260:1)
 	q := r.query.Select("generate")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `pkg` optional argument
@@ -174,13 +174,13 @@ func (r *Go) UnmarshalJSON(bs []byte) error {
 type GoStaticcheckOpts struct {
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:234:2)
+	Pkg string // go (../../../go/main.go:233:2)
 
 	// Default: "latest"
-	Version string // go (../../../go/main.go:237:2)
+	Version string // go (../../../go/main.go:236:2)
 }
 
-func (r *Go) Staticcheck(ctx context.Context, opts ...GoStaticcheckOpts) error { // go (../../../go/main.go:230:1)
+func (r *Go) Staticcheck(ctx context.Context, opts ...GoStaticcheckOpts) error { // go (../../../go/main.go:229:1)
 	if r.staticcheck != nil {
 		return nil
 	}
@@ -203,20 +203,20 @@ func (r *Go) Staticcheck(ctx context.Context, opts ...GoStaticcheckOpts) error {
 type GoTestOpts struct {
 
 	// Default: "."
-	Path string // go (../../../go/main.go:153:2)
+	Path string // go (../../../go/main.go:152:2)
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:156:2)
+	Pkg string // go (../../../go/main.go:155:2)
 
-	Race bool // go (../../../go/main.go:158:2)
+	Race bool // go (../../../go/main.go:157:2)
 
-	Cgo bool // go (../../../go/main.go:160:2)
+	Cgo bool // go (../../../go/main.go:159:2)
 
-	Tags []string // go (../../../go/main.go:162:2)
+	Tags []string // go (../../../go/main.go:161:2)
 }
 
-func (r *Go) Test(ctx context.Context, workspace *Workspace, opts ...GoTestOpts) error { // go (../../../go/main.go:148:1)
-	assertNotNil("workspace", workspace)
+func (r *Go) Test(ctx context.Context, ws *Workspace, opts ...GoTestOpts) error { // go (../../../go/main.go:147:1)
+	assertNotNil("ws", ws)
 	if r.test != nil {
 		return nil
 	}
@@ -243,7 +243,7 @@ func (r *Go) Test(ctx context.Context, workspace *Workspace, opts ...GoTestOpts)
 			q = q.Arg("tags", opts[i].Tags)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return q.Execute(ctx)
 }
@@ -252,11 +252,11 @@ func (r *Go) Test(ctx context.Context, workspace *Workspace, opts ...GoTestOpts)
 type GoTidyOpts struct {
 
 	// Default: "."
-	Path string // go (../../../go/main.go:252:2)
+	Path string // go (../../../go/main.go:251:2)
 }
 
-func (r *Go) Tidy(workspace *Workspace, opts ...GoTidyOpts) *Changeset { // go (../../../go/main.go:247:1)
-	assertNotNil("workspace", workspace)
+func (r *Go) Tidy(ws *Workspace, opts ...GoTidyOpts) *Changeset { // go (../../../go/main.go:246:1)
+	assertNotNil("ws", ws)
 	q := r.query.Select("tidy")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -264,7 +264,7 @@ func (r *Go) Tidy(workspace *Workspace, opts ...GoTidyOpts) *Changeset { // go (
 			q = q.Arg("path", opts[i].Path)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Changeset{
 		query: q,
@@ -275,10 +275,10 @@ func (r *Go) Tidy(workspace *Workspace, opts ...GoTidyOpts) *Changeset { // go (
 type GoVetOpts struct {
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:221:2)
+	Pkg string // go (../../../go/main.go:220:2)
 }
 
-func (r *Go) Vet(ctx context.Context, opts ...GoVetOpts) error { // go (../../../go/main.go:217:1)
+func (r *Go) Vet(ctx context.Context, opts ...GoVetOpts) error { // go (../../../go/main.go:216:1)
 	if r.vet != nil {
 		return nil
 	}
@@ -297,13 +297,13 @@ func (r *Go) Vet(ctx context.Context, opts ...GoVetOpts) error { // go (../../..
 type GoVulncheckOpts struct {
 
 	// Default: "./..."
-	Pkg string // go (../../../go/main.go:204:2)
+	Pkg string // go (../../../go/main.go:203:2)
 
 	// Default: "latest"
-	Version string // go (../../../go/main.go:207:2)
+	Version string // go (../../../go/main.go:206:2)
 }
 
-func (r *Go) Vulncheck(ctx context.Context, opts ...GoVulncheckOpts) error { // go (../../../go/main.go:200:1)
+func (r *Go) Vulncheck(ctx context.Context, opts ...GoVulncheckOpts) error { // go (../../../go/main.go:199:1)
 	if r.vulncheck != nil {
 		return nil
 	}
@@ -339,8 +339,8 @@ type GoOpts struct {
 	Container *Container // go (../../../go/main.go:24:2)
 }
 
-func (r *Query) Go(workspace *Workspace, opts ...GoOpts) *Go { // go (../../../go/main.go:17:1)
-	assertNotNil("workspace", workspace)
+func (r *Query) Go(ws *Workspace, opts ...GoOpts) *Go { // go (../../../go/main.go:17:1)
+	assertNotNil("ws", ws)
 	q := r.query.Select("go")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `path` optional argument
@@ -352,7 +352,7 @@ func (r *Query) Go(workspace *Workspace, opts ...GoOpts) *Go { // go (../../../g
 			q = q.Arg("container", opts[i].Container)
 		}
 	}
-	q = q.Arg("workspace", workspace)
+	q = q.Arg("ws", ws)
 
 	return &Go{
 		query: q,

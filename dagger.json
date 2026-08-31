@@ -14,12 +14,8 @@
       "source": "archive"
     },
     {
-      "name": "compose",
-      "source": "compose"
-    },
-    {
-      "name": "forge",
-      "source": "forge"
+      "name": "controller-gen",
+      "source": "controller-gen"
     },
     {
       "name": "gh",
@@ -44,10 +40,6 @@
     {
       "name": "trivy",
       "source": "trivy"
-    },
-    {
-      "name": "release",
-      "source": "release"
     },
     {
       "name": "upx",

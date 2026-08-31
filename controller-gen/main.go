@@ -76,7 +76,6 @@ func New(
 
 // +generate
 func (c *ControllerGen) Object(
-	ctx context.Context,
 	// +optional
 	// +default=["./..."]
 	paths []string,
@@ -93,7 +92,6 @@ func (c *ControllerGen) Object(
 
 // +generate
 func (c *ControllerGen) RBAC(
-	ctx context.Context,
 	// +optional
 	// +default=["./..."]
 	paths []string,
@@ -116,8 +114,6 @@ func (c *ControllerGen) RBAC(
 
 // +generate
 func (c *ControllerGen) CRD(
-	ctx context.Context,
-	workspace *dagger.Workspace,
 	// +optional
 	// +default=["./..."]
 	paths []string,

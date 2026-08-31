@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/mod/modfile"
 	"github.com/frantjc/daggerverse/go/internal/dagger"
+	"golang.org/x/mod/modfile"
 )
 
 type ControllerGen struct {
@@ -15,6 +15,10 @@ type ControllerGen struct {
 func New(
 	ctx context.Context,
 	workspace *dagger.Workspace,
+	// +optional
+	exclude []string,
+	// +optional
+	gitignore bool,
 	// +optional
 	// +default="."
 	path string,
@@ -28,6 +32,8 @@ func New(
 		container = dag.Go(dagger.GoOpts{
 			Workspace: workspace,
 			Path:      path,
+			Exclude:   exclude,
+			Gitignore: true,
 		}).
 			Container()
 
@@ -61,7 +67,10 @@ func New(
 	return &ControllerGen{
 		Container: container.
 			WithWorkdir("/src").
-			WithMountedDirectory(".", workspace.Directory(path)),
+			WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+				Exclude:   exclude,
+				Gitignore: gitignore,
+			})),
 	}, nil
 }
 

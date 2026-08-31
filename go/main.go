@@ -18,13 +18,19 @@ func New(
 	ctx context.Context,
 	workspace *dagger.Workspace,
 	// +optional
+	exclude []string,
+	// +optional
+	gitignore bool,
+	// +optional
 	// +default="."
 	path string,
 	// +optional
 	container *dagger.Container,
 ) (*Go, error) {
 	src := workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
-		Include: []string{"**/go.mod", "**/go.sum"},
+		Exclude:   exclude,
+		Include:   []string{"**/go.mod", "**/go.sum"},
+		Gitignore: gitignore,
 	})
 
 	goMod := src.File("go.mod")
@@ -93,10 +99,12 @@ func New(
 			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", src).
 			WithExec([]string{"go", "mod", "download"}).
-			WithMountedDirectory(".", workspace.Directory(path)),
+			WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+				Exclude:   exclude,
+				Gitignore: gitignore,
+			})),
 	}, nil
 }
-
 
 func (m *Go) Build(
 	ctx context.Context,
@@ -147,10 +155,6 @@ func (m *Go) Build(
 // +check
 func (m *Go) Test(
 	ctx context.Context,
-	workspace *dagger.Workspace,
-	// +optional
-	// +default="."
-	path string,
 	// +optional
 	// +default="./..."
 	pkg string,

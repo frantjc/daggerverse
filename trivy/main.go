@@ -62,6 +62,10 @@ func (m *Trivy) Repo(
 	ctx context.Context,
 	workspace *dagger.Workspace,
 	// +optional
+	exclude []string,
+	// +optional
+	gitignore bool,
+	// +optional
 	// +default="."
 	path string,
 	// +optional
@@ -105,7 +109,10 @@ func (m *Trivy) Repo(
 	}
 	exec = append(exec, ".")
 	_, err := m.Container.
-		WithMountedDirectory(".", workspace.Directory(path)).
+		WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+			Exclude:   exclude,
+			Gitignore: gitignore,
+		})).
 		WithExec(exec).
 		Sync(ctx)
 	return err
@@ -155,7 +162,7 @@ func (m *Trivy) Image(
 	}
 	name := "image.tar"
 	exec = append(exec, fmt.Sprintf("--input=%s", name))
-	
+
 	_, err := m.Container.
 		WithMountedFile(name, container.AsTarball().WithName(name)).
 		WithExec(exec).

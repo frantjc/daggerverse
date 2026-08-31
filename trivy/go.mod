@@ -9,9 +9,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 )
 
-require github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
-
-require go.opentelemetry.io/otel/sdk v1.43.0
+require (
+	github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
+	go.opentelemetry.io/otel/sdk v1.43.0
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

@@ -16,7 +16,7 @@ type Go struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	exclude []string,
 	// +optional
@@ -27,7 +27,7 @@ func New(
 	// +optional
 	container *dagger.Container,
 ) (*Go, error) {
-	src := workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+	src := ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 		Exclude:   exclude,
 		Include:   []string{"**/go.mod", "**/go.sum"},
 		Gitignore: gitignore,
@@ -99,7 +99,7 @@ func New(
 			WithWorkdir(filepath.Join("$GOPATH/src", parsedGoMod.Module.Mod.Path), dagger.ContainerWithWorkdirOpts{Expand: true}).
 			WithMountedDirectory(".", src).
 			WithExec([]string{"go", "mod", "download"}).
-			WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+			WithMountedDirectory(".", ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 				Exclude:   exclude,
 				Gitignore: gitignore,
 			})),
@@ -189,7 +189,6 @@ func (m *Go) Test(
 
 // +generate
 func (m *Go) Fmt(
-	ctx context.Context,
 	// +optional
 	// +default="./..."
 	pkg string,
@@ -249,8 +248,6 @@ func (m *Go) Staticcheck(
 
 // +generate
 func (m *Go) Tidy(
-	ctx context.Context,
-	workspace *dagger.Workspace,
 	// +optional
 	// +default="."
 	path string,
@@ -263,7 +260,6 @@ func (m *Go) Tidy(
 
 // +generate
 func (m *Go) Generate(
-	ctx context.Context,
 	// +optional
 	// +default="./..."
 	pkg string,

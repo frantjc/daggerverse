@@ -151,7 +151,7 @@ type Mise struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	exclude []string,
 	// +optional
@@ -169,8 +169,8 @@ func New(
 		},
 	}
 
-	if workspace != nil {
-		config := workspace.Directory(path).File("mise.toml")
+	if ws != nil {
+		config := ws.Directory(path).File("mise.toml")
 
 		contents, err := config.Contents(ctx)
 		if err != nil {
@@ -184,7 +184,7 @@ func New(
 
 	return &Mise{
 		Config: c,
-		Src: workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+		Src: ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 			Exclude:   exclude,
 			Gitignore: gitignore,
 		}),

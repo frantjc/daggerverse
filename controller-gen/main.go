@@ -14,7 +14,7 @@ type ControllerGen struct {
 
 func New(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	exclude []string,
 	// +optional
@@ -30,7 +30,7 @@ func New(
 ) (*ControllerGen, error) {
 	if container == nil {
 		container = dag.Go(dagger.GoOpts{
-			Workspace: workspace,
+			Workspace: ws,
 			Path:      path,
 			Exclude:   exclude,
 			Gitignore: true,
@@ -67,7 +67,7 @@ func New(
 	return &ControllerGen{
 		Container: container.
 			WithWorkdir("/src").
-			WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+			WithMountedDirectory(".", ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 				Exclude:   exclude,
 				Gitignore: gitignore,
 			})),

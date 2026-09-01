@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"dagger.io/dagger"
 	"github.com/logsquaredn/rubber/.dagger/modules/godot/internal/dagger"
 	"gopkg.in/ini.v1"
 )
@@ -157,7 +158,7 @@ type Export struct {
 
 func (m *Godot) ExportRelease(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	src *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -171,12 +172,12 @@ func (m *Godot) ExportRelease(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "release", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "release", src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func (m *Godot) ExportDebug(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	src *dagger.Directory,
 	preset,
 	path,
 	// +optional
@@ -190,7 +191,7 @@ func (m *Godot) ExportDebug(
 	// +optional
 	windowsCodesignPassword *dagger.Secret,
 ) (*Export, error) {
-	return m.export(ctx, "debug", workspace.Directory("."), preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
+	return m.export(ctx, "debug", src, preset, path, osslsigncodeVersion, scriptEncryptionKey, windowsCodesignIdentityType, windowsCodesignIdentity, windowsCodesignPassword)
 }
 
 func osslsigncode(

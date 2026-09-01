@@ -60,7 +60,7 @@ func New(
 // +check
 func (m *Trivy) Repo(
 	ctx context.Context,
-	workspace *dagger.Workspace,
+	ws *dagger.Workspace,
 	// +optional
 	exclude []string,
 	// +optional
@@ -109,7 +109,7 @@ func (m *Trivy) Repo(
 	}
 	exec = append(exec, ".")
 	_, err := m.Container.
-		WithMountedDirectory(".", workspace.Directory(path, dagger.WorkspaceDirectoryOpts{
+		WithMountedDirectory(".", ws.Directory(path, dagger.WorkspaceDirectoryOpts{
 			Exclude:   exclude,
 			Gitignore: gitignore,
 		})).

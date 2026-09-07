@@ -164,7 +164,7 @@ func (m *Release) Upload(
 func (m *Release) Assets(
 	ctx context.Context,
 ) ([]ReleaseAsset, error) {
-	out, err := m.runOutput(ctx, m.Gh.Container, "view", "--json", "assets")
+	out, err := m.runOutput(ctx, m.Gh.Container, "view", m.Tag, "--json", "assets")
 	if err != nil {
 		return nil, err
 	}

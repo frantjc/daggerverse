@@ -172,6 +172,7 @@ func (m *Release) Assets(
 		Assets []struct {
 			Name   string `json:"name"`
 			Digest string `json:"digest"`
+			URL    string `json:"url"`
 		} `json:"assets"`
 	}
 	if err := json.Unmarshal([]byte(out), &view); err != nil {
@@ -180,7 +181,7 @@ func (m *Release) Assets(
 
 	assets := make([]ReleaseAsset, len(view.Assets))
 	for i, asset := range view.Assets {
-		assets[i] = ReleaseAsset{Release: *m, Name: asset.Name, Dig: asset.Digest}
+		assets[i] = ReleaseAsset{Release: m, Name: asset.Name, Digest: asset.Digest, URL: asset.URL}
 	}
 	return assets, nil
 }
@@ -227,17 +228,13 @@ func (m *Release) runOutput(ctx context.Context, container *dagger.Container, ar
 
 type ReleaseAsset struct {
 	// +private
-	Release
+	Release *Release
 	// +private
-	Name string
-	// +private
-	Dig string
+	Name   string
+	Digest string
+	URL    string
 }
 
 func (m *ReleaseAsset) File(ctx context.Context) *dagger.File {
 	return m.Release.Download(ctx, []string{m.Name}, "").File(m.Name)
-}
-
-func (m *ReleaseAsset) Digest() string {
-	return m.Dig
 }

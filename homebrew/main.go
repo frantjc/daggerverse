@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
@@ -38,10 +40,16 @@ type tplData struct {
 // from the repo.
 func (m *Homebrew) Cask(
 	ctx context.Context,
-	gh *dagger.Gh,
+	githubToken *dagger.Secret,
 	repo,
 	tag string,
+	// +optional
+	container *dagger.Container,
 ) error {
+	gh := dag.Gh(githubToken, dagger.GhOpts{
+		Container: container,
+	})
+
 	tpl, err := template.New("cask").Parse(caskRbTpl)
 	if err != nil {
 		return err
@@ -52,20 +60,28 @@ func (m *Homebrew) Cask(
 		return fmt.Errorf("expected org/repo format, got %q", repo)
 	}
 
-	description, err := gh.Container().
-		WithExec([]string{"gh", "repo", "view", repo, "--json", "description", "--jq", ".description"}).
+	viewContents, err := gh.Container().
+		WithExec([]string{"gh", "repo", "view", repo, "--json", "description,homepageUrl"}).
 		Stdout(ctx)
 	if err != nil {
 		return err
 	}
 
-	homepage := fmt.Sprintf("https://github.com/%s", repo)
+	view := struct {
+		Description string `json:"description"`
+		Homepage    string `json:"homepageUrl"`
+	}{}
+
+	if err := json.Unmarshal([]byte(viewContents), &view); err != nil {
+		return err
+	}
+
 	version := strings.TrimPrefix(tag, "v")
 
 	data := &tplData{
 		Name:        name,
-		Homepage:    homepage,
-		Description: strings.TrimSpace(description),
+		Homepage:    cmp.Or(view.Homepage, fmt.Sprintf("https://github.com/%s", repo)),
+		Description: view.Description,
 		Version:     version,
 		OsArch:      map[string]map[string]tplOsArchData{},
 	}
@@ -109,8 +125,13 @@ func (m *Homebrew) Cask(
 			data.OsArch[os] = map[string]tplOsArchData{}
 		}
 
+		url, err := asset.URL(ctx)
+		if err != nil {
+			return err
+		}
+
 		data.OsArch[os][arch] = tplOsArchData{
-			URL:    fmt.Sprintf("%s/releases/download/%s/%s", homepage, version, fileName),
+			URL:    url,
 			Sha256: strings.TrimPrefix(digest, "sha256:"),
 		}
 	}

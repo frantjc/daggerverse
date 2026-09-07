@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/logsquaredn/rubber/.dagger/modules/gh/internal/dagger"
 )
@@ -192,7 +193,6 @@ func (m *Release) Download(
 	// +optional
 	archive string,
 ) *dagger.Directory {
-	container := m.Gh.Container
 	args := []string{"download", m.Tag, "--dir=."}
 
 	for _, p := range pattern {
@@ -203,7 +203,7 @@ func (m *Release) Download(
 		args = append(args, fmt.Sprintf("--archive=%s", archive))
 	}
 
-	return container.
+	return m.Gh.Container.
 		WithWorkdir("/dl").
 		WithExec(append([]string{"gh", "release", fmt.Sprintf("--repo=%s", m.Repo)}, args...)).
 		Directory("/dl")
@@ -236,5 +236,22 @@ type ReleaseAsset struct {
 }
 
 func (m *ReleaseAsset) File(ctx context.Context) *dagger.File {
-	return m.Release.Download(ctx, []string{m.Name}, "").File(m.Name)
+	return m.Release.Download(ctx, []string{escapeGlob(m.Name)}, "").File(m.Name)
+}
+
+// escapeGlob escapes glob metacharacters in s so that it is matched
+// literally when used as a `gh release download --pattern` value.
+func escapeGlob(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '*', '?', '[', '\\':
+			b.WriteByte('[')
+			b.WriteRune(r)
+			b.WriteByte(']')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

@@ -3,6 +3,7 @@ module github.com/logsquaredn/rubber/.dagger/modules/gh
 go 1.26.3
 
 require (
+	dagger.io/dagger v0.21.5-0.20260617035525-1309520660f6
 	github.com/Khan/genqlient v0.8.1
 	github.com/dagger/otel-go v1.43.1-0.20260429234604-565634f4374b
 	github.com/vektah/gqlparser/v2 v2.5.33
@@ -29,6 +30,7 @@ require (
 )
 
 require (
+	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59
@@ -37,6 +39,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect

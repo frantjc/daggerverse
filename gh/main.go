@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/logsquaredn/rubber/.dagger/modules/gh/internal/dagger"
@@ -159,6 +160,54 @@ func (m *Release) Upload(
 	return m.run(ctx, container, args...)
 }
 
+func (m *Release) Assets(
+	ctx context.Context,
+) ([]ReleaseAsset, error) {
+	out, err := m.runOutput(ctx, m.Gh.Container, "view", "--json", "assets")
+	if err != nil {
+		return nil, err
+	}
+
+	var view struct {
+		Assets []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal([]byte(out), &view); err != nil {
+		return nil, err
+	}
+
+	assets := make([]ReleaseAsset, len(view.Assets))
+	for i, asset := range view.Assets {
+		assets[i] = ReleaseAsset{Release: *m, Name: asset.Name, Dig: asset.Digest}
+	}
+	return assets, nil
+}
+
+func (m *Release) Download(
+	ctx context.Context,
+	pattern []string,
+	// +optional
+	archive string,
+) *dagger.Directory {
+	container := m.Gh.Container
+	args := []string{"download", m.Tag, "--dir=."}
+
+	for _, p := range pattern {
+		args = append(args, fmt.Sprintf("--pattern=%s", p))
+	}
+
+	if archive != "" {
+		args = append(args, fmt.Sprintf("--archive=%s", archive))
+	}
+
+	return container.
+		WithWorkdir("/dl").
+		WithExec(append([]string{"gh", "release", fmt.Sprintf("--repo=%s", m.Repo)}, args...)).
+		Directory("/dl")
+}
+
 func (m *Release) run(ctx context.Context, container *dagger.Container, args ...string) error {
 	if container == nil {
 		container = m.Gh.Container
@@ -169,104 +218,26 @@ func (m *Release) run(ctx context.Context, container *dagger.Container, args ...
 	return nil
 }
 
-const (
-	workDir = "/tmp"
-	bodyPath = workDir + "/body"
-)
-
-func (m *Gh) SetSecret(
-	ctx context.Context,
-	name string,
-	body *dagger.Secret,
-	// +optional
-	app,
-	// +optional
-	env,
-	// +optional
-	org,
-	// +optional
-	visibility string,
-	// +optional
-	user,
-	// +optional
-	noReposSelected bool,
-	// +optional
-	repo []string,
-) error {
-	return m.set(ctx, "secret", name, body, app, env, org, visibility, user, noReposSelected, repo)
+func (m *Release) runOutput(ctx context.Context, container *dagger.Container, args ...string) (string, error) {
+	if container == nil {
+		container = m.Gh.Container
+	}
+	return container.WithExec(append([]string{"gh", "release", fmt.Sprintf("--repo=%s", m.Repo)}, args...)).Stdout(ctx)
 }
 
-func (m *Gh) SetVariable(
-	ctx context.Context,
-	name string,
-	body *dagger.Secret,
-	// +optional
-	env,
-	// +optional
-	org,
-	// +optional
-	visibility string,
-	// +optional
-	repo []string,
-) error {
-	return m.set(ctx, "variable", name, body, "", env, org, visibility, false, false, repo)
+type ReleaseAsset struct {
+	// +private
+	Release
+	// +private
+	Name string
+	// +private
+	Dig string
 }
 
-func (m *Gh) set(
-	ctx context.Context,
-	kind,
-	name string,
-	body *dagger.Secret,
-	app,
-	env,
-	org,
-	visibility string,
-	user,
-	noReposSelected bool,
-	repo []string,
-) error {
-	args := []string{"gh", kind, "set", name}
+func (m *ReleaseAsset) File(ctx context.Context) *dagger.File {
+	return m.Release.Download(ctx, []string{m.Name}, "").File(m.Name)
+}
 
-	if app != "" {
-		args = append(args, "--app", app)
-	}
-
-	if env != "" {
-		args = append(args, "--env", env)
-	}
-
-	if org != "" {
-		args = append(args, "--org", org)
-	}
-
-	if lenRepo := len(repo); lenRepo == 1 {
-		args = append(args, "--repo", repo[0])
-	} else if lenRepo > 0 {
-		for _, r := range repo {
-			args = append(args, "--repos", r)
-		}
-	}
-
-	if noReposSelected {
-		args = append(args, "--no-repos-selected")
-	}
-
-	if user {
-		args = append(args, "--user")
-	}
-
-	if visibility != "" {
-		args = append(args, "--visibility", visibility)
-	}
-
-	if _, err := m.Container.
-		WithMountedSecret(bodyPath, body).
-		WithExec(args, dagger.ContainerWithExecOpts{
-			RedirectStdin: bodyPath,
-		}).
-		Sync(ctx); err != nil {
-		return err
-	}
-
-	return nil
+func (m *ReleaseAsset) Digest() string {
+	return m.Dig
 }

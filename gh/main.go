@@ -229,10 +229,9 @@ func (m *Release) runOutput(ctx context.Context, container *dagger.Container, ar
 type ReleaseAsset struct {
 	// +private
 	Release *Release
-	// +private
-	Name   string
-	Digest string
-	URL    string
+	Name    string
+	Digest  string
+	URL     string
 }
 
 func (m *ReleaseAsset) File(ctx context.Context) *dagger.File {

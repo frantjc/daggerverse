@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -94,26 +95,14 @@ func (m *Homebrew) Cask(
 	for i := range assets {
 		asset := assets[i]
 
-		file := asset.File()
-
-		fileName, err := file.Name(ctx)
+		name, err := asset.Name(ctx)
 		if err != nil {
 			return err
 		}
 
-		goos, goarch, ok := parseAssetName(fileName, repo, version)
+		os, arch, ok := parseOsArch(name)
 		if !ok {
 			continue
-		}
-
-		os := "linux"
-		if goos == "darwin" {
-			os = "macos"
-		}
-
-		arch := "intel"
-		if goarch == "arm64" {
-			arch = "arm"
 		}
 
 		if _, ok := data.OsArch[os]; !ok {
@@ -176,20 +165,37 @@ func (m *Homebrew) Cask(
 	return err
 }
 
-// parseAssetName parses a release asset file name of the form
-// <name>-<version>-<goos>-<goarch>.tar.gz into its goos and goarch parts.
-func parseAssetName(fileName, name, version string) (goos, goarch string, ok bool) {
-	prefix := fmt.Sprintf("%s-%s-", name, version)
-	if !strings.HasPrefix(fileName, prefix) {
+var (
+	// assetNameRegexp matches a goos/goarch pair anywhere in a release asset
+	// file name with a .tar.gz or .tgz extension, e.g.
+	// "barge-v0.3.3-darwin-amd64.tar.gz". It doesn't anchor on the
+	// name/version prefix so that it's agnostic to tag/version formatting.
+	assetNameRegexp = regexp.MustCompile(
+		`(?:^|[-_])(?P<goos>darwin|linux|windows)[-_](?P<goarch>386|amd64|x86_64|arm64|arm)(?:[-_].*)?\.(?:tar\.gz|tgz)$`,
+	)
+)
+
+// parseOsArch parses a release asset file name for its goos/goarch,
+// returning them as Homebrew-compatible os/arch strings, e.g. "macos"/"arm".
+func parseOsArch(assetName string) (os, arch string, ok bool) {
+	m := assetNameRegexp.FindStringSubmatch(assetName)
+	if m == nil {
 		return "", "", false
 	}
 
-	rest := strings.TrimSuffix(strings.TrimPrefix(fileName, prefix), ".tar.gz")
-
-	goos, goarch, ok = strings.Cut(rest, "-")
-	if !ok {
-		return "", "", false
+	os = m[assetNameRegexp.SubexpIndex("goos")]
+	switch os {
+	case "darwin":
+		os = "macos"
 	}
 
-	return goos, goarch, true
+	arch = m[assetNameRegexp.SubexpIndex("goarch")]
+	switch arch {
+	case "amd64", "x86_64":
+		arch = "intel"
+	case "arm64":
+		arch = "arm"
+	}
+
+	return os, arch, true
 }

@@ -86,7 +86,7 @@ func (m *Homebrew) Cask(
 		OsArch:      map[string]map[string]tplOsArchData{},
 	}
 
-	assets, err := gh.Release(repo, tag).Assets(ctx)
+	assets, err := gh.Release(githubRepo, tag).Assets(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,11 +106,6 @@ func (m *Homebrew) Cask(
 			continue
 		}
 
-		digest, err := asset.Digest(ctx)
-		if err != nil {
-			return err
-		}
-
 		os := "linux"
 		if goos == "darwin" {
 			os = "macos"
@@ -126,6 +121,11 @@ func (m *Homebrew) Cask(
 		}
 
 		url, err := asset.URL(ctx)
+		if err != nil {
+			return err
+		}
+
+		digest, err := asset.Digest(ctx)
 		if err != nil {
 			return err
 		}

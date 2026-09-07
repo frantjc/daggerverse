@@ -41,7 +41,7 @@ type tplData struct {
 func (m *Homebrew) Cask(
 	ctx context.Context,
 	githubToken *dagger.Secret,
-	repo,
+	githubRepo,
 	tag string,
 	// +optional
 	container *dagger.Container,
@@ -55,13 +55,13 @@ func (m *Homebrew) Cask(
 		return err
 	}
 
-	org, name, ok := strings.Cut(repo, "/")
+	org, repo, ok := strings.Cut(githubRepo, "/")
 	if !ok {
-		return fmt.Errorf("expected org/repo format, got %q", repo)
+		return fmt.Errorf("expected org/repo format, got %q", githubRepo)
 	}
 
 	viewContents, err := gh.Container().
-		WithExec([]string{"gh", "repo", "view", repo, "--json", "description,homepageUrl"}).
+		WithExec([]string{"gh", "repo", "view", githubRepo, "--json", "description,homepageUrl"}).
 		Stdout(ctx)
 	if err != nil {
 		return err
@@ -79,8 +79,8 @@ func (m *Homebrew) Cask(
 	version := strings.TrimPrefix(tag, "v")
 
 	data := &tplData{
-		Name:        name,
-		Homepage:    cmp.Or(view.Homepage, fmt.Sprintf("https://github.com/%s", repo)),
+		Name:        repo,
+		Homepage:    cmp.Or(view.Homepage, fmt.Sprintf("https://github.com/%s", githubRepo)),
 		Description: view.Description,
 		Version:     version,
 		OsArch:      map[string]map[string]tplOsArchData{},
@@ -101,7 +101,7 @@ func (m *Homebrew) Cask(
 			return err
 		}
 
-		goos, goarch, ok := parseAssetName(fileName, name, version)
+		goos, goarch, ok := parseAssetName(fileName, repo, version)
 		if !ok {
 			continue
 		}
@@ -147,13 +147,13 @@ func (m *Homebrew) Cask(
 		return err
 	}
 
-	endpoint := fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s.rb", org, name)
+	endpoint := fmt.Sprintf("repos/%s/homebrew-tap/contents/Casks/%s.rb", org, repo)
 	upload := []string{
 		"gh",
 		"api",
 		"-X=PUT",
 		endpoint,
-		"-f", fmt.Sprintf("message=chore: bump %s to %s", name, version),
+		"-f", fmt.Sprintf("message=chore: bump %s to %s", repo, version),
 		"-f", fmt.Sprintf("content=%s", buf.String()),
 	}
 

@@ -30,7 +30,7 @@ func New(
 ) (*ControllerGen, error) {
 	if container == nil {
 		container = dag.Go(dagger.GoOpts{
-			Workspace: ws,
+			Ws: ws,
 			Path:      path,
 			Exclude:   exclude,
 			Gitignore: true,

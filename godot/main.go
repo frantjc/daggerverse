@@ -9,8 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dagger.io/dagger"
-	"github.com/logsquaredn/rubber/.dagger/modules/godot/internal/dagger"
+	"github.com/frantjc/daggerverse/godot/internal/dagger"
 	"gopkg.in/ini.v1"
 )
 

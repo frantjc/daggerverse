@@ -1,4 +1,4 @@
-module github.com/logsquaredn/rubber/.dagger/modules/godot
+module github.com/frantjc/daggerverse/godot
 
 go 1.26.3
 

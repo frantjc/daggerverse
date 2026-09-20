@@ -151,8 +151,18 @@ func getExportPreset(exportPresets *ini.File, preset string) (*ini.Section, *ini
 }
 
 type Export struct {
-	Pck    *dagger.File
-	Binary *dagger.File
+	// +private
+	PckPrivate *dagger.File
+	// +private
+	BinaryPrivate *dagger.File
+}
+
+func (m *Export) Pck() *dagger.File {
+	return m.PckPrivate
+}
+
+func (m *Export) Binary() *dagger.File {
+	return m.BinaryPrivate
 }
 
 func (m *Godot) ExportRelease(
@@ -261,7 +271,6 @@ func (m *Godot) export(
 
 	embedPck, _ := strconv.ParseBool(options.Key("binary_format/embed_pck").Value())
 
-
 	xdgDataHome, err := container.EnvVariable(ctx, "XDG_DATA_HOME")
 	if err != nil {
 		return nil, err
@@ -273,7 +282,7 @@ func (m *Godot) export(
 
 		xdgDataHome = filepath.Join(home, ".local", "share")
 	}
-	
+
 	export := container.
 		WithDirectory(fmt.Sprintf("%s/godot/export_templates/%s.%s", xdgDataHome, m.Version, m.Flavor), m.ExportTemplates, dagger.ContainerWithDirectoryOpts{
 			Expand: true,
@@ -314,12 +323,12 @@ func (m *Godot) export(
 
 	if embedPck {
 		return &Export{
-			Binary: export.File(path),
+			BinaryPrivate: export.File(path),
 		}, nil
 	}
 
 	return &Export{
-		Binary: export.File(path),
-		Pck:    export.File(fmt.Sprintf("%s.pck", strings.TrimSuffix(path, filepath.Ext(path)))),
+		BinaryPrivate: export.File(path),
+		PckPrivate:    export.File(fmt.Sprintf("%s.pck", strings.TrimSuffix(path, filepath.Ext(path)))),
 	}, nil
 }

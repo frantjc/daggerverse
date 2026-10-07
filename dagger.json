@@ -38,6 +38,10 @@
       "source": "mise"
     },
     {
+      "name": "steamworks",
+      "source": "steamworks"
+    },
+    {
       "name": "trivy",
       "source": "trivy"
     },

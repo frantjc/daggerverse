@@ -116,6 +116,25 @@ type Depot struct {
 	Recursive bool
 }
 
+// Depot creates a Steam depot that maps files from the build content.
+func (m *Steamworks) Depot(
+	// The depot ID.
+	depotID int,
+	// A glob, relative to the content directory, of the files to include.
+	// Defaults to every file.
+	// +optional
+	path string,
+	// Include matching files in subdirectories.
+	// +optional
+	recursive bool,
+) *Depot {
+	return &Depot{
+		DepotID:   depotID,
+		Path:      path,
+		Recursive: recursive,
+	}
+}
+
 // AppBuild uploads content to Steam using steamcmd's run_app_build,
 // returning the build output (logs and cache files).
 func (s *Steamcmd) AppBuild(
@@ -161,9 +180,9 @@ func (s *Steamcmd) AppBuild(
 		Directory(buildOutput), nil
 }
 
-// DRMWrap wraps a Windows executable with Steam DRM using steamcmd's drm_wrap
+// DrmWrap wraps a Windows executable with Steam DRM using steamcmd's drm_wrap
 // and the drmtoolp tool, returning the wrapped executable.
-func (s *Steamcmd) DRMWrap(
+func (s *Steamcmd) DrmWrap(
 	ctx context.Context,
 	// The ID of the app the executable belongs to.
 	appID int,

@@ -87,22 +87,24 @@ func (m *Steamworks) Steamcmd(
 	}
 }
 
-// login returns the container with the credentials set, if any, and the
-// steamcmd arguments, to be Expand-ed, that log in with them.
-func (s *Steamcmd) login(container *dagger.Container) (*dagger.Container, []string) {
-	exec := []string{"steamcmd", "+login", s.Username}
+// withSteamcmd returns the container with the credentials set, if any, and
+// the exec that runs steamcmd, logged in with them, followed by args.
+// Secret variables can't be Expand-ed, so a shell does the substitution instead.
+func (s *Steamcmd) withSteamcmd(container *dagger.Container, args ...string) (*dagger.Container, []string) {
+	script := `exec steamcmd +login "$STEAMCMD_USERNAME"`
+	container = container.WithEnvVariable("STEAMCMD_USERNAME", s.Username)
 
 	if s.Password != nil {
-		exec = append(exec, "$STEAMCMD_PASSWORD")
+		script += ` "$STEAMCMD_PASSWORD"`
 		container = container.WithSecretVariable("STEAMCMD_PASSWORD", s.Password)
 
 		if s.SteamGuardCode != nil {
-			exec = append(exec, "$STEAMCMD_GUARD_CODE")
+			script += ` "$STEAMCMD_GUARD_CODE"`
 			container = container.WithSecretVariable("STEAMCMD_GUARD_CODE", s.SteamGuardCode)
 		}
 	}
 
-	return container, exec
+	return container, append([]string{"sh", "-c", script + ` "$@"`, "sh"}, args...)
 }
 
 // Depot maps files from the build content into a Steam depot.
@@ -165,19 +167,15 @@ func (s *Steamcmd) AppBuild(
 		return nil, err
 	}
 
-	container, exec := s.login(
+	container, exec := s.withSteamcmd(
 		s.Container.
 			WithNewFile(vdfPath, buf.String()).
 			WithMountedDirectory(contentRoot, content).
 			WithDirectory(buildOutput, dag.Directory()),
+		"+run_app_build", vdfPath, "+quit",
 	)
 
-	return container.
-		WithExec(
-			append(exec, "+run_app_build", vdfPath, "+quit"),
-			dagger.ContainerWithExecOpts{Expand: true},
-		).
-		Directory(buildOutput), nil
+	return container.WithExec(exec).Directory(buildOutput), nil
 }
 
 // DrmWrap wraps a Windows executable with Steam DRM using steamcmd's drm_wrap
@@ -212,16 +210,12 @@ func (s *Steamcmd) DrmWrap(
 		flags |= drmFlagSkipDebuggerCheck
 	}
 
-	container, exec := s.login(
+	container, exec := s.withSteamcmd(
 		s.Container.
 			WithMountedFile(in, executable).
 			WithDirectory(path.Dir(out), dag.Directory()),
+		"+drm_wrap", strconv.Itoa(appID), in, out, "drmtoolp", strconv.Itoa(flags), "+quit",
 	)
 
-	return container.
-		WithExec(
-			append(exec, "+drm_wrap", strconv.Itoa(appID), in, out, "drmtoolp", strconv.Itoa(flags), "+quit"),
-			dagger.ContainerWithExecOpts{Expand: true},
-		).
-		File(out), nil
+	return container.WithExec(exec).File(out), nil
 }

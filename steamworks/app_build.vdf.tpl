@@ -2,6 +2,9 @@
 {
 	"AppID" "{{ .AppID }}"
 	"Desc" "{{ .Desc }}"
+{{- if .Branch }}
+	"SetLive" "{{ .Branch }}"
+{{- end }}
 	"ContentRoot" "{{ .ContentRoot }}"
 	"BuildOutput" "{{ .BuildOutput }}"
 	"Depots"

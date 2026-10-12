@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"fmt"
 	"path"
 	"strconv"
 	"text/template"
+	"time"
 
 	"github.com/frantjc/daggerverse/steamworks/internal/dagger"
 )
@@ -22,6 +24,8 @@ const (
 )
 
 var (
+	configVdfPaths = []string{"$HOME/Steam/config/config.vdf", "$HOME/.local/share/Steam/config/config.vdf"}
+
 	//go:embed app_build.vdf.tpl
 	appBuildVdfTplContents string
 
@@ -59,10 +63,15 @@ type Steamcmd struct {
 	Password *dagger.Secret
 	// +private
 	SteamGuardCode *dagger.Secret
+	// +private
+	ConfigVdf *dagger.Secret
 }
 
 // Steamcmd returns steamcmd, logged in as a Steam account if a password is given.
+//
+// +cache="session"
 func (m *Steamworks) Steamcmd(
+	ctx context.Context,
 	// The steamcmd container.
 	// +optional
 	// +defaultAddress="docker.io/steamcmd/steamcmd"
@@ -76,21 +85,54 @@ func (m *Steamworks) Steamcmd(
 	// +optional
 	password *dagger.Secret,
 	// The Steam Guard code of the Steam account, if it has one. Ignored without a password.
+	// Takes precedence over the shared secret.
 	// +optional
 	steamGuardCode *dagger.Secret,
-) *Steamcmd {
+	// The base64-encoded shared secret of the Steam account's Steam Guard mobile authenticator,
+	// used to generate a fresh Steam Guard code (TOTP). Ignored without a password.
+	// +optional
+	sharedSecret *dagger.Secret,
+	// The contents of the config.vdf of a previously authorized steamcmd session,
+	// so that email-based Steam Guard is not prompted for again.
+	// +optional
+	configVdf *dagger.Secret,
+) (*Steamcmd, error) {
+	if steamGuardCode == nil && sharedSecret != nil {
+		plaintext, err := sharedSecret.Plaintext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		code, err := generateSteamGuardCode(plaintext, time.Now())
+		if err != nil {
+			return nil, err
+		}
+
+		steamGuardCode = dag.SetSecret("steamcmd-steam-guard-code", code)
+	}
+
 	return &Steamcmd{
 		Container:      container,
 		Username:       username,
 		Password:       password,
 		SteamGuardCode: steamGuardCode,
-	}
+		ConfigVdf:      configVdf,
+	}, nil
 }
 
 // withSteamcmd returns the container with the credentials set, if any, and
 // the exec that runs steamcmd, logged in with them, followed by args.
 // Secret variables can't be Expand-ed, so a shell does the substitution instead.
 func (s *Steamcmd) withSteamcmd(container *dagger.Container, args ...string) (*dagger.Container, []string) {
+	if s.ConfigVdf != nil {
+		// Which of these steamcmd reads depends on how it was installed, so cover both.
+		for _, p := range configVdfPaths {
+			container = container.WithMountedSecret(p, s.ConfigVdf, dagger.ContainerWithMountedSecretOpts{
+				Expand: true,
+			})
+		}
+	}
+
 	script := `exec steamcmd +login "$STEAMCMD_USERNAME"`
 	container = container.WithEnvVariable("STEAMCMD_USERNAME", s.Username)
 
@@ -137,9 +179,11 @@ func (m *Steamworks) Depot(
 	}
 }
 
-// AppBuild uploads content to Steam using steamcmd's run_app_build,
-// returning the build output (logs and cache files).
+// AppBuild uploads content to Steam using steamcmd's run_app_build.
+// The build output (logs and cache files) is kept in a cache volume
+// per app ID so that steamcmd's build cache is reused between builds.
 func (s *Steamcmd) AppBuild(
+	ctx context.Context,
 	// The ID of the app to build.
 	appID int,
 	// The directory of files to upload.
@@ -149,7 +193,12 @@ func (s *Steamcmd) AppBuild(
 	// A description of the build, visible only to the developer.
 	// +optional
 	desc string,
-) (*dagger.Directory, error) {
+	// The beta branch to automatically set the build live on once uploaded.
+	// Without it, the build is uploaded but not set live on any branch.
+	// Steam does not allow automatically setting builds live on the default branch.
+	// +optional
+	branch string,
+) error {
 	for i := range depots {
 		if depots[i].Path == "" {
 			depots[i].Path = "*"
@@ -160,22 +209,25 @@ func (s *Steamcmd) AppBuild(
 	if err := appBuildVdfTpl.Execute(buf, map[string]any{
 		"AppID":       appID,
 		"Desc":        desc,
+		"Branch":      branch,
 		"ContentRoot": contentRoot,
 		"BuildOutput": buildOutput,
 		"Depots":      depots,
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
 	container, exec := s.withSteamcmd(
 		s.Container.
 			WithNewFile(vdfPath, buf.String()).
 			WithMountedDirectory(contentRoot, content).
-			WithDirectory(buildOutput, dag.Directory()),
+			WithMountedCache(buildOutput, dag.CacheVolume(fmt.Sprintf("steamworks-app-build-%d", appID))),
 		"+run_app_build", vdfPath, "+quit",
 	)
 
-	return container.WithExec(exec).Directory(buildOutput), nil
+	_, err := container.WithExec(exec).Sync(ctx)
+
+	return err
 }
 
 // DrmWrap wraps a Windows executable with Steam DRM using steamcmd's drm_wrap

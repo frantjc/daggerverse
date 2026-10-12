@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -43,6 +44,7 @@ var (
 
 type ConfigTool struct {
 	Version string
+	Depends []string
 }
 
 // UnmarshalTOML implements [toml.Unmarshaler].
@@ -53,6 +55,16 @@ func (t *ConfigTool) UnmarshalTOML(v any) error {
 	case map[string]any:
 		if version, ok := val["version"].(string); ok {
 			t.Version = version
+		}
+		switch depends := val["depends"].(type) {
+		case string:
+			t.Depends = []string{depends}
+		case []any:
+			for _, d := range depends {
+				if str, ok := d.(string); ok {
+					t.Depends = append(t.Depends, str)
+				}
+			}
 		}
 	default:
 		return fmt.Errorf("unexpected type %T for tool", v)
@@ -142,6 +154,19 @@ type Config struct {
 	Env        ConfigEnv             `toml:"env,omitempty"`
 }
 
+var (
+	// knownRegistry maps tool short names to their backends so that
+	// `mise tool --json` only has to be run for tools not listed here.
+	knownRegistry = map[string]string{
+		"ansible-core": "pipx",
+		"azure-cli":    "pipx",
+		"go":           "core",
+		"node":         "core",
+		"opentofu":     "aqua",
+		"pnpm":         "aqua",
+	}
+)
+
 type Mise struct {
 	// +private
 	Config *Config
@@ -206,31 +231,9 @@ func (m *Mise) Container(
 		_, ok := m.Config.Tools[tool]
 		return ok && (lenTools == 0 || slices.Contains(tools, tool))
 	}
-	var usesBackend = func(backend string) bool {
-		for tool := range m.Config.Tools {
-			if lenTools == 0 || slices.Contains(tools, tool) {
-				if _, ok := m.Config.ToolAlias[tool]; ok {
-					tool = m.Config.ToolAlias[tool]
-				}
-				if strings.HasPrefix(tool, fmt.Sprintf("%s:", backend)) {
-					return true
-				}
-			}
-		}
-		return false
+	var selected = func(tool string) bool {
+		return lenTools == 0 || slices.Contains(tools, tool)
 	}
-	packages := []string{"git", "bash"}
-	var appendPackagesIf = func(cond bool, pkgs ...string) []string {
-		if cond {
-			return append(packages, pkgs...)
-		}
-		return packages
-	}
-	packages = appendPackagesIf(usesBackend("pipx") || usesTool("azure-cli") || usesTool("ansible-core"), "uv")
-	packages = appendPackagesIf(usesTool("opentofu"), "curl")
-	packages = appendPackagesIf(usesTool("go"), "gcc")
-	packages = appendPackagesIf(usesTool("node") || usesTool("pnpm"), "libatomic", "libstdc++")
-	packages = xslices.Unique(packages)
 
 	arch, err := dag.Arch().Microsoft(ctx)
 	if err != nil {
@@ -252,6 +255,89 @@ func (m *Mise) Container(
 			),
 		).
 		File("mise/bin/mise")
+
+	probe := dag.Wolfi().
+		Container().
+		WithFile("/usr/local/bin/mise", mise)
+	toolBackends := map[string]string{}
+	var backendOf = func(name string) (string, error) {
+		if backend, ok := toolBackends[name]; ok {
+			return backend, nil
+		}
+
+		resolved := name
+		if alias, ok := m.Config.ToolAlias[name]; ok {
+			resolved = alias
+		}
+
+		backend, _, found := strings.Cut(resolved, ":")
+		if !found {
+			if backend, found = knownRegistry[resolved]; !found {
+				stdout, err := probe.
+					WithExec([]string{"mise", "tool", "--json", resolved}).
+					Stdout(ctx)
+				if err != nil {
+					return "", err
+				}
+
+				info := struct {
+					Backend string `json:"backend"`
+				}{}
+				if err := json.Unmarshal([]byte(stdout), &info); err != nil {
+					return "", err
+				}
+
+				backend, _, _ = strings.Cut(info.Backend, ":")
+			}
+		}
+
+		toolBackends[name] = backend
+		return backend, nil
+	}
+
+	var usesBackendsWithoutDepends = func(backends []string, depends string) (bool, error) {
+		for name, tool := range m.Config.Tools {
+			if !selected(name) || slices.Contains(tool.Depends, depends) {
+				continue
+			}
+
+			backend, err := backendOf(name)
+			if err != nil {
+				return false, err
+			}
+
+			if slices.Contains(backends, backend) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	packages := []string{"git", "bash"}
+	var appendPackagesIf = func(cond bool, pkgs ...string) []string {
+		if cond {
+			return append(packages, pkgs...)
+		}
+		return packages
+	}
+	for _, b := range []struct {
+		backends []string
+		depends  string
+		pkg      string
+	}{
+		{[]string{"pipx", "pypi"}, "uv", "uv"},
+		{[]string{"go"}, "go", "go-1.27"},
+		{[]string{"npm"}, "node", "nodejs-26"},
+	} {
+		uses, err := usesBackendsWithoutDepends(b.backends, b.depends)
+		if err != nil {
+			return nil, err
+		}
+		packages = appendPackagesIf(uses, b.pkg)
+	}
+	packages = appendPackagesIf(usesTool("opentofu"), "curl")
+	packages = appendPackagesIf(usesTool("go"), "gcc")
+	packages = appendPackagesIf(usesTool("node") || usesTool("pnpm"), "libatomic", "libstdc++")
+	packages = xslices.Unique(packages)
 
 	container := dag.Wolfi().
 		Container(dagger.WolfiContainerOpts{

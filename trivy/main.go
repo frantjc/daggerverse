@@ -19,7 +19,7 @@ func New(
 	// +optional
 	modules *dagger.Directory,
 	// +optional
-	// +defaultAddress="docker.io/aquasec/trivy:0.72.0"
+	// +defaultAddress="docker.io/aquasec/trivy:0.75.0"
 	container *dagger.Container,
 ) *Trivy {
 	return &Trivy{
@@ -69,8 +69,6 @@ func (m *Trivy) Repo(
 	// +optional
 	offlineScan,
 	// +optional
-	skipVersionCheck,
-	// +optional
 	ignoreUnfixed bool,
 	// +optional
 	enableModules,
@@ -81,7 +79,7 @@ func (m *Trivy) Repo(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "repo", "--exit-code=1"}
+	exec := []string{"trivy", "repo", "--exit-code=1", "--skip-version-check"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}
@@ -121,8 +119,6 @@ func (m *Trivy) Image(
 	// +optional
 	offlineScan,
 	// +optional
-	skipVersionCheck,
-	// +optional
 	ignoreUnfixed bool,
 	// +optional
 	enableModules,
@@ -133,7 +129,7 @@ func (m *Trivy) Image(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "image", "--exit-code=1"}
+	exec := []string{"trivy", "image", "--exit-code=1", "--skip-version-check"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}

@@ -62,10 +62,6 @@ func (m *Trivy) Repo(
 	ctx context.Context,
 	ws *dagger.Workspace,
 	// +optional
-	exclude []string,
-	// +optional
-	gitignore bool,
-	// +optional
 	// +default="."
 	path string,
 	// +optional
@@ -85,7 +81,7 @@ func (m *Trivy) Repo(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "repo"}
+	exec := []string{"trivy", "repo", "--exit-code=1"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}
@@ -102,7 +98,7 @@ func (m *Trivy) Repo(
 		exec = append(exec, "--ignore-unfixed")
 	}
 	if disableTelemtry {
-		exec = append(exec, "--disable-telemtry")
+		exec = append(exec, "--disable-telemetry")
 	}
 	if offlineScan {
 		exec = append(exec, "--offline-scan")
@@ -110,8 +106,7 @@ func (m *Trivy) Repo(
 	exec = append(exec, ".")
 	_, err := m.Container.
 		WithMountedDirectory(".", ws.Directory(path, dagger.WorkspaceDirectoryOpts{
-			Exclude:   exclude,
-			Gitignore: gitignore,
+			Gitignore: true,
 		})).
 		WithExec(exec).
 		Sync(ctx)
@@ -138,7 +133,7 @@ func (m *Trivy) Image(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "image"}
+	exec := []string{"trivy", "image", "--exit-code=1"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}
@@ -155,7 +150,7 @@ func (m *Trivy) Image(
 		exec = append(exec, "--ignore-unfixed")
 	}
 	if disableTelemtry {
-		exec = append(exec, "--disable-telemtry")
+		exec = append(exec, "--disable-telemetry")
 	}
 	if offlineScan {
 		exec = append(exec, "--offline-scan")

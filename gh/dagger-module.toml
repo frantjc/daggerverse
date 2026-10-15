@@ -1,0 +1,9 @@
+name = "gh"
+engineVersion = "v0.21.7"
+
+[runtime]
+  source = "go"
+
+[[dependencies]]
+  name = "wolfi"
+  source = "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef"

@@ -7,5 +7,5 @@ A Dagger module for building, testing, and maintaining Go projects. It sets up a
 Build a binary for Linux/arm64:
 
 ```sh
-dagger call -m github.com/frantjc/daggerverse/go build --goos linux --goarch arm64 export --path ./myapp
+dagger api call -m github.com/frantjc/daggerverse/go build --goos linux --goarch arm64 export --path ./myapp
 ```

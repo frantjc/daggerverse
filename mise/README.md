@@ -7,5 +7,5 @@ A Dagger module that installs and activates tools managed by [mise](https://mise
 Install tools from a project's `mise.toml` and open a terminal:
 
 ```sh
-dagger call -m github.com/frantjc/daggerverse/mise --source . container terminal
+dagger api call -m github.com/frantjc/daggerverse/mise container terminal
 ```

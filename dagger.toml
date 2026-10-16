@@ -10,13 +10,13 @@ is-module = true
 [sdks.go.scopes.archive]
 is-module = true
 clients = [
-  "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef",
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
 ]
 
 [sdks.go.scopes.gh]
 is-module = true
 clients = [
-  "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef",
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
 ]
 
 [sdks.go.scopes.steamworks]
@@ -28,7 +28,7 @@ is-module = true
 [sdks.go.scopes.upx]
 is-module = true
 clients = [
-  "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef",
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
 ]
 
 [sdks.go.scopes.go]
@@ -39,7 +39,7 @@ clients = ["./go"]
 is-module = true
 
 [sdks.go.scopes.godot]
-clients = ["./arch", "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef"]
+clients = ["./arch", "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc"]
 is-module = true
 
 [sdks.go.scopes.homebrew]
@@ -51,5 +51,5 @@ clients = ["./archive"]
 is-module = true
 
 [sdks.go.scopes.mise]
-clients = ["./arch", "./archive", "github.com/dagger/dagger/modules/wolfi@054f94b2d86c0ac00bef11ac4550816973c4aeef"]
+clients = ["./arch", "./archive", "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc"]
 is-module = true

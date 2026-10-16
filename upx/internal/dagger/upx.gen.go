@@ -3,123 +3,13 @@
 package dagger
 
 import (
-	"context"
-	"encoding/json"
-
-	"github.com/dagger/querybuilder"
+	"github.com/frantjc/daggerverse/upx/internal/dagger/core"
 )
 
 // UpxOpts contains options for Query.Upx
-type UpxOpts struct {
-	Container *Container
-}
+type UpxOpts = core.UpxOpts
 
-func (r *Query) Upx(opts ...UpxOpts) *Upx { // upx (../../../:0:0)
-	q := r.query.Select("upx")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
-
-	return &Upx{
-		query: q,
-	}
-}
-
-type Upx struct { // upx (../../../:0:0)
-	query *querybuilder.Selection
-
-	id *ID
-}
-
-func (r *Upx) WithGraphQLQuery(q *querybuilder.Selection) *Upx {
-	return &Upx{
-		query: q,
-	}
-}
-
-func (r *Upx) Container() *Container {
-	q := r.query.Select("container")
-
-	return &Container{
-		query: q,
-	}
-}
-
-// A unique identifier for this Upx.
-func (r *Upx) ID(ctx context.Context) (ID, error) {
-	if r.id != nil {
-		return *r.id, nil
-	}
-	q := r.query.Select("id")
-
-	var response ID
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
-func (r *Upx) XXX_GraphQLType() string {
-	return "Upx"
-}
-
-// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
-func (r *Upx) XXX_GraphQLIDType() string {
-	return "ID"
-}
-
-// XXX_GraphQLID is an internal function. It returns the underlying type ID
-func (r *Upx) XXX_GraphQLID(ctx context.Context) (string, error) {
-	id, err := r.ID(ctx)
-	if err != nil {
-		return "", err
-	}
-	return string(id), nil
-}
-
-func (r *Upx) MarshalJSON() ([]byte, error) {
-	id, err := r.ID(marshalCtx)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(id)
-}
-func (r *Upx) UnmarshalJSON(bs []byte) error {
-	var id string
-	err := json.Unmarshal(bs, &id)
-	if err != nil {
-		return err
-	}
-	*r = Upx{query: selectNode(dag.query, id, "Upx")}
-	return nil
-}
+type Upx = core.Upx
 
 // UpxPackOpts contains options for Upx.Pack
-type UpxPackOpts struct {
-	Brute bool
-
-	Lzma bool
-}
-
-func (r *Upx) Pack(executable *File, opts ...UpxPackOpts) *File {
-	assertNotNil("executable", executable)
-	q := r.query.Select("pack")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `brute` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Brute) {
-			q = q.Arg("brute", opts[i].Brute)
-		}
-		// `lzma` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Lzma) {
-			q = q.Arg("lzma", opts[i].Lzma)
-		}
-	}
-	q = q.Arg("executable", executable)
-
-	return &File{
-		query: q,
-	}
-}
+type UpxPackOpts = core.UpxPackOpts

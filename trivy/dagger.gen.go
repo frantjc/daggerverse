@@ -218,11 +218,25 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg disableTelemtry", err))
 				}
 			}
+			var ignoreUnfixed bool
+			if inputArgs["ignoreUnfixed"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["ignoreUnfixed"]), &ignoreUnfixed)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ignoreUnfixed", err))
+				}
+			}
 			var offlineScan bool
 			if inputArgs["offlineScan"] != nil {
 				err = json.Unmarshal([]byte(inputArgs["offlineScan"]), &offlineScan)
 				if err != nil {
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg offlineScan", err))
+				}
+			}
+			var skipVersionCheck bool
+			if inputArgs["skipVersionCheck"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["skipVersionCheck"]), &skipVersionCheck)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg skipVersionCheck", err))
 				}
 			}
 			var enableModules []string
@@ -253,7 +267,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ignoreStatus", err))
 				}
 			}
-			return nil, (*Trivy).Image(&parent, ctx, container, disableTelemtry, offlineScan, enableModules, severity, scanners, ignoreStatus)
+			return nil, (*Trivy).Image(&parent, ctx, container, disableTelemtry, ignoreUnfixed, offlineScan, skipVersionCheck, enableModules, severity, scanners, ignoreStatus)
 		case "Repo":
 			var parent Trivy
 			err = json.Unmarshal(parentJSON, &parent)
@@ -281,11 +295,25 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg disableTelemtry", err))
 				}
 			}
+			var ignoreUnfixed bool
+			if inputArgs["ignoreUnfixed"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["ignoreUnfixed"]), &ignoreUnfixed)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ignoreUnfixed", err))
+				}
+			}
 			var offlineScan bool
 			if inputArgs["offlineScan"] != nil {
 				err = json.Unmarshal([]byte(inputArgs["offlineScan"]), &offlineScan)
 				if err != nil {
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg offlineScan", err))
+				}
+			}
+			var skipVersionCheck bool
+			if inputArgs["skipVersionCheck"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["skipVersionCheck"]), &skipVersionCheck)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg skipVersionCheck", err))
 				}
 			}
 			var enableModules []string
@@ -316,7 +344,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ignoreStatus", err))
 				}
 			}
-			return nil, (*Trivy).Repo(&parent, ctx, ws, path, disableTelemtry, offlineScan, enableModules, severity, scanners, ignoreStatus)
+			return nil, (*Trivy).Repo(&parent, ctx, ws, path, disableTelemtry, ignoreUnfixed, offlineScan, skipVersionCheck, enableModules, severity, scanners, ignoreStatus)
 		case "":
 			var parent Trivy
 			err = json.Unmarshal(parentJSON, &parent)
@@ -349,14 +377,16 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("Image",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithSourceMap(dag.SourceMap("main.go", 109, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 111, 2)}).
-							WithArg("disableTelemtry", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 113, 2)}).
-							WithArg("offlineScan", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 115, 2)}).
-							WithArg("enableModules", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 117, 2)}).
-							WithArg("severity", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 119, 2)}).
-							WithArg("scanners", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 121, 2)}).
-							WithArg("ignoreStatus", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 123, 2)})).
+							WithSourceMap(dag.SourceMap("main.go", 119, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 121, 2)}).
+							WithArg("disableTelemtry", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 123, 2)}).
+							WithArg("ignoreUnfixed", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 125, 2)}).
+							WithArg("offlineScan", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 127, 2)}).
+							WithArg("skipVersionCheck", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 129, 2)}).
+							WithArg("enableModules", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 131, 2)}).
+							WithArg("severity", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 133, 2)}).
+							WithArg("scanners", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 135, 2)}).
+							WithArg("ignoreStatus", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 137, 2)})).
 					WithFunction(
 						dag.Function("Repo",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
@@ -365,18 +395,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 63, 2)}).
 							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 66, 2), DefaultValue: dagger.JSON("\".\"")}).
 							WithArg("disableTelemtry", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 68, 2)}).
-							WithArg("offlineScan", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 70, 2)}).
-							WithArg("enableModules", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 72, 2)}).
-							WithArg("severity", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 74, 2)}).
-							WithArg("scanners", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 76, 2)}).
-							WithArg("ignoreStatus", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 78, 2)})).
+							WithArg("ignoreUnfixed", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 70, 2)}).
+							WithArg("offlineScan", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 72, 2)}).
+							WithArg("skipVersionCheck", dag.TypeDef().WithKind(dagger.TypeDefKindBooleanKind).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 74, 2)}).
+							WithArg("enableModules", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 76, 2)}).
+							WithArg("severity", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 78, 2)}).
+							WithArg("scanners", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 80, 2)}).
+							WithArg("ignoreStatus", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 82, 2)})).
 					WithField("Container", dag.TypeDef().WithObject("Container"), dagger.TypeDefWithFieldOpts{SourceMap: dag.SourceMap("main.go", 14, 2)}).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Trivy")).
 							WithSourceMap(dag.SourceMap("main.go", 17, 1)).
 							WithArg("modules", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 20, 2)}).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 23, 2), DefaultAddress: "docker.io/aquasec/trivy:0.75.0"}))), nil
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 23, 2), DefaultAddress: "docker.io/aquasec/trivy:0.76.0"}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

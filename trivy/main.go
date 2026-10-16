@@ -19,7 +19,7 @@ func New(
 	// +optional
 	modules *dagger.Directory,
 	// +optional
-	// +defaultAddress="docker.io/aquasec/trivy:0.75.0"
+	// +defaultAddress="docker.io/aquasec/trivy:0.76.0"
 	container *dagger.Container,
 ) *Trivy {
 	return &Trivy{
@@ -67,7 +67,11 @@ func (m *Trivy) Repo(
 	// +optional
 	disableTelemtry,
 	// +optional
-	offlineScan bool,
+	ignoreUnfixed,
+	// +optional
+	offlineScan,
+	// +optional
+	skipVersionCheck bool,
 	// +optional
 	enableModules,
 	// +optional
@@ -77,7 +81,7 @@ func (m *Trivy) Repo(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "repo", "--exit-code=1", "--skip-version-check", "--ignore-unfixed"}
+	exec := []string{"trivy", "repo", "--exit-code=1"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}
@@ -93,8 +97,14 @@ func (m *Trivy) Repo(
 	if disableTelemtry {
 		exec = append(exec, "--disable-telemetry")
 	}
+	if ignoreUnfixed {
+		exec = append(exec, "--ignore-unfixed")
+	}
 	if offlineScan {
 		exec = append(exec, "--offline-scan")
+	}
+	if skipVersionCheck {
+		exec = append(exec, "--skip-version-check")
 	}
 	exec = append(exec, ".")
 	_, err := m.Container.
@@ -112,7 +122,11 @@ func (m *Trivy) Image(
 	// +optional
 	disableTelemtry,
 	// +optional
-	offlineScan bool,
+	ignoreUnfixed,
+	// +optional
+	offlineScan,
+	// +optional
+	skipVersionCheck bool,
 	// +optional
 	enableModules,
 	// +optional
@@ -122,7 +136,7 @@ func (m *Trivy) Image(
 	// +optional
 	ignoreStatus []string,
 ) error {
-	exec := []string{"trivy", "image", "--exit-code=1", "--skip-version-check", "--ignore-unfixed"}
+	exec := []string{"trivy", "image", "--exit-code=1"}
 	if len(enableModules) > 0 {
 		exec = append(exec, fmt.Sprintf("--enable-modules=%s", strings.Join(enableModules, ",")))
 	}
@@ -138,8 +152,14 @@ func (m *Trivy) Image(
 	if disableTelemtry {
 		exec = append(exec, "--disable-telemetry")
 	}
+	if ignoreUnfixed {
+		exec = append(exec, "--ignore-unfixed")
+	}
 	if offlineScan {
 		exec = append(exec, "--offline-scan")
+	}
+	if skipVersionCheck {
+		exec = append(exec, "--skip-version-check")
 	}
 	name := "image.tar"
 	exec = append(exec, fmt.Sprintf("--input=%s", name))

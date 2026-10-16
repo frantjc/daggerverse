@@ -124,7 +124,11 @@ func (r *Trivy) UnmarshalJSON(bs []byte) error {
 type TrivyImageOpts struct {
 	DisableTelemtry bool
 
+	IgnoreUnfixed bool
+
 	OfflineScan bool
+
+	SkipVersionCheck bool
 
 	EnableModules []string
 
@@ -146,9 +150,17 @@ func (r *Trivy) Image(ctx context.Context, container *Container, opts ...TrivyIm
 		if !querybuilder.IsZeroValue(opts[i].DisableTelemtry) {
 			q = q.Arg("disableTelemtry", opts[i].DisableTelemtry)
 		}
+		// `ignoreUnfixed` optional argument
+		if !querybuilder.IsZeroValue(opts[i].IgnoreUnfixed) {
+			q = q.Arg("ignoreUnfixed", opts[i].IgnoreUnfixed)
+		}
 		// `offlineScan` optional argument
 		if !querybuilder.IsZeroValue(opts[i].OfflineScan) {
 			q = q.Arg("offlineScan", opts[i].OfflineScan)
+		}
+		// `skipVersionCheck` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SkipVersionCheck) {
+			q = q.Arg("skipVersionCheck", opts[i].SkipVersionCheck)
 		}
 		// `enableModules` optional argument
 		if !querybuilder.IsZeroValue(opts[i].EnableModules) {
@@ -180,7 +192,11 @@ type TrivyRepoOpts struct {
 
 	DisableTelemtry bool
 
+	IgnoreUnfixed bool
+
 	OfflineScan bool
+
+	SkipVersionCheck bool
 
 	EnableModules []string
 
@@ -206,9 +222,17 @@ func (r *Trivy) Repo(ctx context.Context, ws *Workspace, opts ...TrivyRepoOpts) 
 		if !querybuilder.IsZeroValue(opts[i].DisableTelemtry) {
 			q = q.Arg("disableTelemtry", opts[i].DisableTelemtry)
 		}
+		// `ignoreUnfixed` optional argument
+		if !querybuilder.IsZeroValue(opts[i].IgnoreUnfixed) {
+			q = q.Arg("ignoreUnfixed", opts[i].IgnoreUnfixed)
+		}
 		// `offlineScan` optional argument
 		if !querybuilder.IsZeroValue(opts[i].OfflineScan) {
 			q = q.Arg("offlineScan", opts[i].OfflineScan)
+		}
+		// `skipVersionCheck` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SkipVersionCheck) {
+			q = q.Arg("skipVersionCheck", opts[i].SkipVersionCheck)
 		}
 		// `enableModules` optional argument
 		if !querybuilder.IsZeroValue(opts[i].EnableModules) {

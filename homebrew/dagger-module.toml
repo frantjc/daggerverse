@@ -1,0 +1,9 @@
+name = "homebrew"
+engineVersion = "v1.0.0-beta.18"
+
+[runtime]
+  source = "go"
+
+[[dependencies]]
+  name = "gh"
+  source = "../gh"

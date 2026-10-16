@@ -13,7 +13,7 @@ Accounts protected by Steam Guard can authenticate with any of the following (as
 - `--config-vdf`: the contents of the `config.vdf` (e.g. `file://config.vdf`) of a session previously authorized by logging in with `steamcmd` locally, so that no code is needed at all. Still requires `--password`.
 
 ```sh
-dagger call steamcmd \
+dagger api call steamcmd \
   --username "$STEAM_USERNAME" \
   --password env://STEAM_PASSWORD \
   --shared-secret env://STEAM_SHARED_SECRET \
@@ -24,7 +24,7 @@ dagger call steamcmd \
 Upload a directory to Steam with `steamcmd`'s `+run_app_build`. The build output directory is backed by a cache volume per app ID, so steamcmd's build cache is reused between builds:
 
 ```sh
-dagger call steamcmd \
+dagger api call steamcmd \
   --username "$STEAM_USERNAME" \
   --password env://STEAM_PASSWORD \
   app-build \
@@ -36,7 +36,7 @@ dagger call steamcmd \
 By default the uploaded build is not set live on any branch. Pass `--branch` to set it live on a beta branch once uploaded (Steam does not allow this for the `default` branch):
 
 ```sh
-dagger call steamcmd \
+dagger api call steamcmd \
   --username "$STEAM_USERNAME" \
   --password env://STEAM_PASSWORD \
   app-build \
@@ -49,7 +49,7 @@ dagger call steamcmd \
 Wrap an executable with [Steam DRM](https://partner.steamgames.com/doc/features/drm):
 
 ```sh
-dagger call steamcmd drm-wrap \
+dagger api call steamcmd drm-wrap \
   --username "$STEAM_USERNAME" \
   --password env://STEAM_PASSWORD \
   drm-wrap \

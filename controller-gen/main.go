@@ -29,8 +29,7 @@ func New(
 	version string,
 ) (*ControllerGen, error) {
 	if container == nil {
-		container = dag.Go(dagger.GoOpts{
-			Ws: ws,
+		container = dag.Go(ws, dagger.GoOpts{
 			Path:      path,
 			Exclude:   exclude,
 			Gitignore: true,

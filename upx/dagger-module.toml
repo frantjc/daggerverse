@@ -1,0 +1,9 @@
+name = "upx"
+engineVersion = "v1.0.0-beta.18"
+
+[runtime]
+  source = "go"
+
+[[dependencies]]
+  name = "wolfi"
+  source = "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc"

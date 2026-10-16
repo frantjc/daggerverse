@@ -1,0 +1,55 @@
+[modules.dagger-go-sdk]
+source = "github.com/dagger/go-sdk"
+
+[sdks.go]
+module = "dagger-go-sdk"
+
+[sdks.go.scopes.arch]
+is-module = true
+
+[sdks.go.scopes.archive]
+is-module = true
+clients = [
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
+]
+
+[sdks.go.scopes.gh]
+is-module = true
+clients = [
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
+]
+
+[sdks.go.scopes.steamworks]
+is-module = true
+
+[sdks.go.scopes.trivy]
+is-module = true
+
+[sdks.go.scopes.upx]
+is-module = true
+clients = [
+  "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc",
+]
+
+[sdks.go.scopes.go]
+is-module = true
+
+[sdks.go.scopes.controller-gen]
+clients = ["./go"]
+is-module = true
+
+[sdks.go.scopes.godot]
+clients = ["./arch", "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc"]
+is-module = true
+
+[sdks.go.scopes.homebrew]
+clients = ["./gh"]
+is-module = true
+
+[sdks.go.scopes.kwok]
+clients = ["./archive"]
+is-module = true
+
+[sdks.go.scopes.mise]
+clients = ["./arch", "./archive", "github.com/dagger/wolfi@0b73dcbea9c7d63969d747386f96b0694fb4dadc"]
+is-module = true

@@ -7,7 +7,7 @@ A Dagger module for spinning up a lightweight, simulated Kubernetes cluster usin
 Start a KWOK cluster:
 
 ```sh
-dagger call -m github.com/frantjc/daggerverse/kwok cluster container as-service up
+dagger api call -m github.com/frantjc/daggerverse/kwok cluster container as-service up
 ```
 
 And talk to it:

@@ -9,7 +9,8 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-type Arch struct { // arch (../../../arch/main.go:9:6)
+// Reports the engine's architecture in the naming conventions of various ecosystems.
+type Arch struct { // arch (../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -31,8 +32,8 @@ func (r *Arch) WithGraphQLQuery(q *querybuilder.Selection) *Arch {
 	}
 }
 
-// GNU returns the architecture in GNU/uname naming (e.g. "x86_64", "aarch64").
-func (r *Arch) Gnu(ctx context.Context) (string, error) { // arch (../../../arch/main.go:38:1)
+// Returns the architecture in GNU/uname naming (e.g. "x86_64", "aarch64").
+func (r *Arch) Gnu(ctx context.Context) (string, error) { // arch (../../../:0:0)
 	if r.gnu != nil {
 		return *r.gnu, nil
 	}
@@ -99,8 +100,8 @@ func (r *Arch) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// Microsoft returns the architecture in Microsoft naming (e.g. "x64", "arm64").
-func (r *Arch) Microsoft(ctx context.Context) (string, error) { // arch (../../../arch/main.go:54:1)
+// Returns the architecture in Microsoft naming (e.g. "x64", "arm64").
+func (r *Arch) Microsoft(ctx context.Context) (string, error) { // arch (../../../:0:0)
 	if r.microsoft != nil {
 		return *r.microsoft, nil
 	}
@@ -112,8 +113,8 @@ func (r *Arch) Microsoft(ctx context.Context) (string, error) { // arch (../../.
 	return response, q.Execute(ctx)
 }
 
-// OCI returns the architecture in OCI/Go naming (e.g. "amd64", "arm64").
-func (r *Arch) Oci(ctx context.Context) (string, error) { // arch (../../../arch/main.go:33:1)
+// Returns the architecture in OCI/Go naming (e.g. "amd64", "arm64").
+func (r *Arch) Oci(ctx context.Context) (string, error) { // arch (../../../:0:0)
 	if r.oci != nil {
 		return *r.oci, nil
 	}
@@ -134,7 +135,8 @@ func (r *Arch) AsNode() Node {
 	}
 }
 
-func (r *Query) Arch() *Arch { // arch (../../../arch/main.go:16:1)
+// Reports the engine's architecture in the naming conventions of various ecosystems.
+func (r *Query) Arch() *Arch { // arch (../../../:0:0)
 	q := r.query.Select("arch")
 
 	return &Arch{

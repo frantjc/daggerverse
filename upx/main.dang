@@ -1,0 +1,35 @@
+"""
+Compresses executables using UPX.
+"""
+type Upx {
+  container: Container!
+
+  new(container: Container) {
+    self.container = container ?? wolfi.container(packages: ["upx"])
+    self
+  }
+
+  """
+  Compresses an executable. Pass lzma for better compression at the cost of
+  decompression speed, or brute to try all methods and pick the smallest result.
+  """
+  pack(executable: File!, brute: Boolean! = false, lzma: Boolean! = false): File! {
+    let fileName = executable.name
+    let name = if (fileName == "") "input" else fileName
+    let args = ["upx"]
+    if (brute) {
+      args += ["--brute"]
+    }
+    if (lzma) {
+      args += ["--lzma"]
+    } else {
+      args += ["--no-lzma"]
+    }
+    args += [name]
+
+    self.container
+      .withFile(name, executable)
+      .withExec(args)
+      .file(name)
+  }
+}

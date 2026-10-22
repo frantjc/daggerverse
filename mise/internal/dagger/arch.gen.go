@@ -6,4 +6,5 @@ import (
 	"github.com/frantjc/daggerverse/mise/internal/dagger/core"
 )
 
+// Reports the engine's architecture in the naming conventions of various ecosystems.
 type Arch = core.Arch

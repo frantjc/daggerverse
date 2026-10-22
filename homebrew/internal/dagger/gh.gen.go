@@ -6,6 +6,7 @@ import (
 	"github.com/frantjc/daggerverse/mise/internal/dagger/core"
 )
 
+// Wraps the GitHub CLI for creating GitHub releases and uploading release assets.
 type Gh = core.Gh
 
 type GhRelease = core.GhRelease

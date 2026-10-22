@@ -6,4 +6,5 @@ import (
 	"github.com/frantjc/daggerverse/godot/internal/dagger/core"
 )
 
+// Reports the engine's architecture in the naming conventions of various ecosystems.
 type Arch = core.Arch

@@ -1,6 +1,10 @@
+[tool_alias]
+dang = "go:github.com/vito/dang/v2/cmd/dang"
+
 [tools]
 dagger = "0.21.7"
-go = "1.26.3"
+dang = { version = "2.1.4", "depends" = "go" }
+go = "1.27.3"
 
 [env]
 DAGGER_X_RELEASE = "v1.0.0-beta.18"

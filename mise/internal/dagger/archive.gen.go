@@ -6,6 +6,7 @@ import (
 	"github.com/frantjc/daggerverse/mise/internal/dagger/core"
 )
 
+// Creates and extracts tar, tgz, tar.xz, and zip archives.
 type Archive = core.Archive
 
 // ArchiveTarOpts contains options for Archive.Tar

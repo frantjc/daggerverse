@@ -1,0 +1,47 @@
+"""
+Reports the engine's architecture in the naming conventions of various ecosystems.
+"""
+type Arch {
+  let arch: String!
+
+  new {
+    let platform = toString(defaultPlatform)
+    let parts = platform.split("/")
+    if (parts.length < 2) {
+      raise "invalid platform " + platform
+    }
+    self.arch = parts[1] ?? ""
+    self
+  }
+
+  """
+  Returns the architecture in OCI/Go naming (e.g. "amd64", "arm64").
+  """
+  oci: String! { arch }
+
+  """
+  Returns the architecture in GNU/uname naming (e.g. "x86_64", "aarch64").
+  """
+  gnu: String! {
+    case (arch) {
+      "amd64" => "x86_64"
+      "arm64" => "aarch64"
+      "arm" => "armv7l"
+      "386" => "i686"
+      else => raise "unknown arch " + arch
+    }
+  }
+
+  """
+  Returns the architecture in Microsoft naming (e.g. "x64", "arm64").
+  """
+  microsoft: String! {
+    case (arch) {
+      "amd64" => "x64"
+      "arm64" => "arm64"
+      "arm" => "arm"
+      "386" => "x86"
+      else => raise "unknown arch " + arch
+    }
+  }
+}

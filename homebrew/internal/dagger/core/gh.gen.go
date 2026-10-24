@@ -9,7 +9,8 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-type Gh struct { // gh (../../../gh/main.go:12:6)
+// Wraps the GitHub CLI for creating GitHub releases and uploading release assets.
+type Gh struct { // gh (../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -28,7 +29,7 @@ func (r *Gh) WithGraphQLQuery(q *querybuilder.Selection) *Gh {
 	}
 }
 
-func (r *Gh) Container() *Container { // gh (../../../gh/main.go:13:2)
+func (r *Gh) Container() *Container { // gh (../../../:0:0)
 	q := r.query.Select("container")
 
 	return &Container{
@@ -92,7 +93,8 @@ func (r *Gh) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-func (r *Gh) Release(repo string, tag string) *GhRelease { // gh (../../../gh/main.go:41:1)
+// Returns the release of the given repository for the given tag.
+func (r *Gh) Release(repo string, tag string) *GhRelease { // gh (../../../:0:0)
 	q := r.query.Select("release")
 	q = q.Arg("repo", repo)
 	q = q.Arg("tag", tag)
@@ -112,7 +114,7 @@ func (r *Gh) AsNode() Node {
 	}
 }
 
-type GhRelease struct { // gh (../../../gh/main.go:32:6)
+type GhRelease struct { // gh (../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -134,7 +136,8 @@ func (r *GhRelease) WithGraphQLQuery(q *querybuilder.Selection) *GhRelease {
 	}
 }
 
-func (r *GhRelease) Assets(ctx context.Context) ([]GhReleaseAsset, error) { // gh (../../../gh/main.go:164:1)
+// Lists the release's assets.
+func (r *GhRelease) Assets(ctx context.Context) ([]GhReleaseAsset, error) { // gh (../../../:0:0)
 	q := r.query.Select("assets")
 
 	q = q.Select("id")
@@ -168,20 +171,21 @@ func (r *GhRelease) Assets(ctx context.Context) ([]GhReleaseAsset, error) { // g
 
 // GhReleaseCreateOpts contains options for GhRelease.Create
 type GhReleaseCreateOpts struct {
-	Title string // gh (../../../gh/main.go:48:2)
+	Title string // gh (../../../:0:0)
 
-	GenerateNotes bool // gh (../../../gh/main.go:50:2)
+	GenerateNotes bool // gh (../../../:0:0)
 
-	Latest bool // gh (../../../gh/main.go:52:2)
+	Latest bool // gh (../../../:0:0)
 
-	Prerelease bool // gh (../../../gh/main.go:54:2)
+	Prerelease bool // gh (../../../:0:0)
 
-	Draft bool // gh (../../../gh/main.go:56:2)
+	Draft bool // gh (../../../:0:0)
 
-	VerifyTag bool // gh (../../../gh/main.go:58:2)
+	VerifyTag bool // gh (../../../:0:0)
 }
 
-func (r *GhRelease) Create(ctx context.Context, opts ...GhReleaseCreateOpts) error { // gh (../../../gh/main.go:45:1)
+// Creates the release.
+func (r *GhRelease) Create(ctx context.Context, opts ...GhReleaseCreateOpts) error { // gh (../../../:0:0)
 	if r.create != nil {
 		return nil
 	}
@@ -218,10 +222,11 @@ func (r *GhRelease) Create(ctx context.Context, opts ...GhReleaseCreateOpts) err
 
 // GhReleaseDownloadOpts contains options for GhRelease.Download
 type GhReleaseDownloadOpts struct {
-	Archive string // gh (../../../gh/main.go:194:2)
+	Archive string // gh (../../../:0:0)
 }
 
-func (r *GhRelease) Download(pattern []string, opts ...GhReleaseDownloadOpts) *Directory { // gh (../../../gh/main.go:190:1)
+// Downloads the release's assets matching the patterns into a directory.
+func (r *GhRelease) Download(pattern []string, opts ...GhReleaseDownloadOpts) *Directory { // gh (../../../:0:0)
 	q := r.query.Select("download")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `archive` optional argument
@@ -239,20 +244,21 @@ func (r *GhRelease) Download(pattern []string, opts ...GhReleaseDownloadOpts) *D
 
 // GhReleaseEditOpts contains options for GhRelease.Edit
 type GhReleaseEditOpts struct {
-	Title string // gh (../../../gh/main.go:92:2)
+	Title string // gh (../../../:0:0)
 
-	GenerateNotes bool // gh (../../../gh/main.go:94:2)
+	GenerateNotes bool // gh (../../../:0:0)
 
-	Latest bool // gh (../../../gh/main.go:96:2)
+	Latest bool // gh (../../../:0:0)
 
-	Prerelease bool // gh (../../../gh/main.go:98:2)
+	Prerelease bool // gh (../../../:0:0)
 
-	Draft bool // gh (../../../gh/main.go:100:2)
+	Draft bool // gh (../../../:0:0)
 
-	VerifyTag bool // gh (../../../gh/main.go:102:2)
+	VerifyTag bool // gh (../../../:0:0)
 }
 
-func (r *GhRelease) Edit(ctx context.Context, opts ...GhReleaseEditOpts) error { // gh (../../../gh/main.go:89:1)
+// Edits the release.
+func (r *GhRelease) Edit(ctx context.Context, opts ...GhReleaseEditOpts) error { // gh (../../../:0:0)
 	if r.edit != nil {
 		return nil
 	}
@@ -344,10 +350,11 @@ func (r *GhRelease) UnmarshalJSON(bs []byte) error {
 
 // GhReleaseUploadOpts contains options for GhRelease.Upload
 type GhReleaseUploadOpts struct {
-	Clobber bool // gh (../../../gh/main.go:137:2)
+	Clobber bool // gh (../../../:0:0)
 }
 
-func (r *GhRelease) Upload(ctx context.Context, assets []*File, opts ...GhReleaseUploadOpts) error { // gh (../../../gh/main.go:133:1)
+// Uploads files to the release as assets.
+func (r *GhRelease) Upload(ctx context.Context, assets []*File, opts ...GhReleaseUploadOpts) error { // gh (../../../:0:0)
 	if r.upload != nil {
 		return nil
 	}
@@ -372,7 +379,7 @@ func (r *GhRelease) AsNode() Node {
 	}
 }
 
-type GhReleaseAsset struct { // gh (../../../gh/main.go:229:6)
+type GhReleaseAsset struct { // gh (../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -394,7 +401,7 @@ func (r *GhReleaseAsset) WithGraphQLQuery(q *querybuilder.Selection) *GhReleaseA
 	}
 }
 
-func (r *GhReleaseAsset) Digest(ctx context.Context) (string, error) { // gh (../../../gh/main.go:233:2)
+func (r *GhReleaseAsset) Digest(ctx context.Context) (string, error) { // gh (../../../:0:0)
 	if r.digest != nil {
 		return *r.digest, nil
 	}
@@ -406,7 +413,8 @@ func (r *GhReleaseAsset) Digest(ctx context.Context) (string, error) { // gh (..
 	return response, q.Execute(ctx)
 }
 
-func (r *GhReleaseAsset) File() *File { // gh (../../../gh/main.go:237:1)
+// Downloads the asset.
+func (r *GhReleaseAsset) File() *File { // gh (../../../:0:0)
 	q := r.query.Select("file")
 
 	return &File{
@@ -470,7 +478,7 @@ func (r *GhReleaseAsset) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-func (r *GhReleaseAsset) Name(ctx context.Context) (string, error) { // gh (../../../gh/main.go:232:2)
+func (r *GhReleaseAsset) Name(ctx context.Context) (string, error) { // gh (../../../:0:0)
 	if r.name != nil {
 		return *r.name, nil
 	}
@@ -482,7 +490,7 @@ func (r *GhReleaseAsset) Name(ctx context.Context) (string, error) { // gh (../.
 	return response, q.Execute(ctx)
 }
 
-func (r *GhReleaseAsset) URL(ctx context.Context) (string, error) { // gh (../../../gh/main.go:234:2)
+func (r *GhReleaseAsset) URL(ctx context.Context) (string, error) { // gh (../../../:0:0)
 	if r.url != nil {
 		return *r.url, nil
 	}
@@ -505,10 +513,11 @@ func (r *GhReleaseAsset) AsNode() Node {
 
 // GhOpts contains options for Query.Gh
 type GhOpts struct {
-	Container *Container // gh (../../../gh/main.go:19:2)
+	Container *Container // gh (../../../:0:0)
 }
 
-func (r *Query) Gh(githubToken *Secret, opts ...GhOpts) *Gh { // gh (../../../gh/main.go:16:1)
+// Wraps the GitHub CLI for creating GitHub releases and uploading release assets.
+func (r *Query) Gh(githubToken *Secret, opts ...GhOpts) *Gh { // gh (../../../:0:0)
 	assertNotNil("githubToken", githubToken)
 	q := r.query.Select("gh")
 	for i := len(opts) - 1; i >= 0; i-- {

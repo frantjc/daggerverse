@@ -1,0 +1,68 @@
+"""
+Creates and extracts tar, tgz, tar.xz, and zip archives.
+"""
+type Archive {
+  let ctr: Container!
+
+  new(container: Container) {
+    self.ctr = container ?? wolfi.container(packages: ["zip"])
+    self
+  }
+
+  """
+  Archives a directory into a tarball, optionally compressed with gzip.
+  """
+  tar(directory: Directory!, gzip: Boolean! = false): File! {
+    let dirName = directory.name
+    let name = if (dirName == "") "input" else dirName
+    let src = `/tmp/${name}`
+    let flags = if (gzip) "-czf" else "-cf"
+    let out = if (gzip) `/tmp/${name}.tgz` else `/tmp/${name}.tar`
+
+    ctr
+      .withWorkdir(src)
+      .withDirectory(".", directory)
+      .withExec(["tar", flags, out, "."])
+      .file(out)
+  }
+
+  """
+  Extracts a tarball into a directory. The compression is detected from the
+  file extension (.tgz, .tar.gz, .tar.xz).
+  """
+  untar(file: File!): Directory! {
+    let fileName = file.name
+    let name = if (fileName == "") "input.tar" else fileName
+    let flags = case {
+      name.hasSuffix("gz") => "-xzf"
+      name.hasSuffix("xz") => "-xJf"
+      else => "-xf"
+    }
+    let base = name.trimSuffix(".tgz").trimSuffix(".tar.gz").trimSuffix(".tar.xz")
+    let dirName = if (base == "") "output" else base
+    let src = `/tmp/${name}`
+    let out = `/tmp/${dirName}`
+
+    ctr
+      .withFile(src, file)
+      .withWorkdir(out)
+      .withExec(["tar", flags, src])
+      .directory(out)
+  }
+
+  """
+  Archives a directory into a zip file.
+  """
+  zip(directory: Directory!): File! {
+    let dirName = directory.name
+    let name = if (dirName == "") "input" else dirName
+    let src = `/tmp/${name}`
+    let out = `/tmp/${name}.zip`
+
+    ctr
+      .withWorkdir(src)
+      .withDirectory(".", directory)
+      .withExec(["zip", "-r", "-q", out, "."])
+      .file(out)
+  }
+}

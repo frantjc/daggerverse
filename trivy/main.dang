@@ -1,0 +1,114 @@
+"""
+Runs Trivy scans.
+"""
+type Trivy {
+  let ctr: Container!
+
+  let defaultImage = container.from("docker.io/aquasec/trivy:0.76.0")
+
+  let scanFlags(
+    enableModules: [String!]!,
+    severity: [String!]!,
+    scanners: [String!]!,
+    ignoreStatus: [String!]!,
+    disableTelemtry: Boolean!,
+    ignoreUnfixed: Boolean!,
+    offlineScan: Boolean!,
+    skipVersionCheck: Boolean!,
+  ): [String!]! {
+    let flags = [] :: [String!]!
+    if (!enableModules.isEmpty) {
+      flags += [`--enable-modules=${enableModules.join(",")}`]
+    }
+    if (!severity.isEmpty) {
+      flags += [`--severity=${severity.join(",")}`]
+    }
+    if (!scanners.isEmpty) {
+      flags += [`--scanners=${scanners.join(",")}`]
+    }
+    if (!ignoreStatus.isEmpty) {
+      flags += [`--ignore-status=${ignoreStatus.join(",")}`]
+    }
+    if (disableTelemtry) {
+      flags += ["--disable-telemetry"]
+    }
+    if (ignoreUnfixed) {
+      flags += ["--ignore-unfixed"]
+    }
+    if (offlineScan) {
+      flags += ["--offline-scan"]
+    }
+    if (skipVersionCheck) {
+      flags += ["--skip-version-check"]
+    }
+    flags
+  }
+
+  new(modules: Directory, container: Container) {
+    let base = (container ?? defaultImage).withWorkdir("/src")
+    if ((base.envVariable("XDG_CACHE_HOME") ?? "") == "") {
+      base = base.withEnvVariable("XDG_CACHE_HOME", "$HOME/.cache", expand: true)
+    }
+    if ((base.envVariable("TRIVY_CACHE_DIR") ?? "") == "") {
+      base = base.withEnvVariable("TRIVY_CACHE_DIR", "$XDG_CACHE_HOME/trivy", expand: true)
+    }
+    base = base.withMountedCache("$TRIVY_CACHE_DIR", cacheVolume("trivy"), expand: true)
+    if (modules != null) {
+      base = base.withMountedDirectory("$TRIVY_MODULE_DIR", modules, expand: true)
+    }
+    self.ctr = base
+    self
+  }
+
+  """
+  Scans a directory of the workspace.
+  """
+  repo(
+    ws: Workspace!,
+    path: String! = ".",
+    disableTelemtry: Boolean! = false,
+    ignoreUnfixed: Boolean! = false,
+    offlineScan: Boolean! = false,
+    skipVersionCheck: Boolean! = false,
+    enableModules: [String!]! = [],
+    severity: [String!]! = [],
+    scanners: [String!]! = [],
+    ignoreStatus: [String!]! = [],
+  ): Void @check {
+    let flags = scanFlags(enableModules, severity, scanners, ignoreStatus, disableTelemtry, ignoreUnfixed, offlineScan, skipVersionCheck)
+    let args = ["trivy", "repo", "--exit-code=1"] + flags + ["."]
+
+    ctr
+      .withMountedDirectory(".", ws.directory(path, gitignore: true))
+      .withExec(args)
+      .sync
+
+    null
+  }
+
+  """
+  Scans a container image.
+  """
+  image(
+    container: Container!,
+    disableTelemtry: Boolean! = false,
+    ignoreUnfixed: Boolean! = false,
+    offlineScan: Boolean! = false,
+    skipVersionCheck: Boolean! = false,
+    enableModules: [String!]! = [],
+    severity: [String!]! = [],
+    scanners: [String!]! = [],
+    ignoreStatus: [String!]! = [],
+  ): Void {
+    let name = "image.tar"
+    let flags = scanFlags(enableModules, severity, scanners, ignoreStatus, disableTelemtry, ignoreUnfixed, offlineScan, skipVersionCheck)
+    let args = ["trivy", "image", "--exit-code=1"] + flags + [`--input=${name}`]
+
+    ctr
+      .withMountedFile(name, container.asTarball.withName(name))
+      .withExec(args)
+      .sync
+
+    null
+  }
+}

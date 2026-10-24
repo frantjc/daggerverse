@@ -9,7 +9,8 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-type Archive struct { // archive (../../../archive/main.go:11:6)
+// Creates and extracts tar, tgz, tar.xz, and zip archives.
+type Archive struct { // archive (../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -85,10 +86,11 @@ func (r *Archive) UnmarshalJSON(bs []byte) error {
 
 // ArchiveTarOpts contains options for Archive.Tar
 type ArchiveTarOpts struct {
-	Gzip bool // archive (../../../archive/main.go:32:2)
+	Gzip bool // archive (../../../:0:0)
 }
 
-func (r *Archive) Tar(directory *Directory, opts ...ArchiveTarOpts) *File { // archive (../../../archive/main.go:28:1)
+// Archives a directory into a tarball, optionally compressed with gzip.
+func (r *Archive) Tar(directory *Directory, opts ...ArchiveTarOpts) *File { // archive (../../../:0:0)
 	assertNotNil("directory", directory)
 	q := r.query.Select("tar")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -105,7 +107,9 @@ func (r *Archive) Tar(directory *Directory, opts ...ArchiveTarOpts) *File { // a
 	}
 }
 
-func (r *Archive) Untar(file *File) *Directory { // archive (../../../archive/main.go:54:1)
+// Extracts a tarball into a directory. The compression is detected from the
+// file extension (.tgz, .tar.gz, .tar.xz).
+func (r *Archive) Untar(file *File) *Directory { // archive (../../../:0:0)
 	assertNotNil("file", file)
 	q := r.query.Select("untar")
 	q = q.Arg("file", file)
@@ -116,7 +120,8 @@ func (r *Archive) Untar(file *File) *Directory { // archive (../../../archive/ma
 	}
 }
 
-func (r *Archive) Zip(directory *Directory) *File { // archive (../../../archive/main.go:86:1)
+// Archives a directory into a zip file.
+func (r *Archive) Zip(directory *Directory) *File { // archive (../../../:0:0)
 	assertNotNil("directory", directory)
 	q := r.query.Select("zip")
 	q = q.Arg("directory", directory)
@@ -138,10 +143,11 @@ func (r *Archive) AsNode() Node {
 
 // ArchiveOpts contains options for Query.Archive
 type ArchiveOpts struct {
-	Container *Container // archive (../../../archive/main.go:18:2)
+	Container *Container // archive (../../../:0:0)
 }
 
-func (r *Query) Archive(opts ...ArchiveOpts) *Archive { // archive (../../../archive/main.go:16:1)
+// Creates and extracts tar, tgz, tar.xz, and zip archives.
+func (r *Query) Archive(opts ...ArchiveOpts) *Archive { // archive (../../../:0:0)
 	q := r.query.Select("archive")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `container` optional argument

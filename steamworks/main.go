@@ -1,4 +1,3 @@
-// Build and publish games with the Steamworks tooling.
 package main
 
 import (

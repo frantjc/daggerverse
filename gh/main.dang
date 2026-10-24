@@ -1,0 +1,165 @@
+"""
+Wraps the GitHub CLI for creating GitHub releases and uploading release assets.
+"""
+type Gh {
+  container: Container!
+
+  new(githubToken: Secret!, container: Container) {
+    self.container = (container ?? wolfi.container(packages: ["gh"]))
+      .withSecretVariable("GITHUB_TOKEN", githubToken)
+    self
+  }
+
+  """
+  Returns the release of the given repository for the given tag.
+  """
+  release(repo: String!, tag: String!): Release! {
+    Release(self, repo, tag)
+  }
+}
+
+type Release {
+  let gh: Gh!
+  let repo: String!
+  let tag: String!
+
+  let command(args: [String!]!): [String!]! {
+    ["gh", "release", `--repo=${repo}`] + args
+  }
+
+  let flags(
+    title: String!,
+    generateNotes: Boolean!,
+    latest: Boolean!,
+    prerelease: Boolean!,
+    draft: Boolean!,
+    verifyTag: Boolean!,
+    latestFlags: [String!]!,
+  ): [String!]! {
+    let out = [] :: [String!]!
+    if (title != "") {
+      out += [`--title=${title}`]
+    }
+    if (generateNotes) {
+      out += ["--generate-notes"]
+    }
+    if (latest) {
+      out += latestFlags
+    } else {
+      if (prerelease) {
+        out += ["--prerelease"]
+      }
+      if (draft) {
+        out += ["--draft"]
+      }
+    }
+    if (verifyTag) {
+      out += ["--verify-tag"]
+    }
+    out
+  }
+
+  """
+  Creates the release.
+  """
+  create(
+    title: String! = "",
+    generateNotes: Boolean! = false,
+    latest: Boolean! = false,
+    prerelease: Boolean! = false,
+    draft: Boolean! = false,
+    verifyTag: Boolean! = false,
+  ): Void {
+    let args = ["create", tag] + flags(title, generateNotes, latest, prerelease, draft, verifyTag, ["--latest"])
+
+    gh.container.withExec(command(args)).sync
+
+    null
+  }
+
+  """
+  Edits the release.
+  """
+  edit(
+    title: String! = "",
+    generateNotes: Boolean! = false,
+    latest: Boolean! = false,
+    prerelease: Boolean! = false,
+    draft: Boolean! = false,
+    verifyTag: Boolean! = false,
+  ): Void {
+    let args = ["edit", tag] + flags(title, generateNotes, latest, prerelease, draft, verifyTag, ["--latest", "--draft=false", "--prerelease=false"])
+
+    gh.container.withExec(command(args)).sync
+
+    null
+  }
+
+  """
+  Uploads files to the release as assets.
+  """
+  upload(assets: [File!]!, clobber: Boolean! = false): Void {
+    let ctr = gh.container
+    let args = ["upload", tag]
+    if (clobber) {
+      args += ["--clobber"]
+    }
+    assets.each { asset =>
+      let name = asset.name
+      ctr = ctr.withFile(name, asset)
+      args += [name]
+    }
+
+    ctr.withExec(command(args)).sync
+
+    null
+  }
+
+  """
+  Lists the release's assets.
+  """
+  assets: [ReleaseAsset!]! {
+    let out = gh.container.withExec(command(["view", tag, "--json", "assets"])).stdout
+    let view: {{assets: [{{name: String!, digest: String!, url: String!}}!]!}}! = JSON.decode(out)
+
+    view.assets.map { asset =>
+      ReleaseAsset(release: self, name: asset.name, digest: asset.digest, url: asset.url)
+    }
+  }
+
+  """
+  Downloads the release's assets matching the patterns into a directory.
+  """
+  download(pattern: [String!]!, archive: String! = ""): Directory! {
+    let args = ["download", tag, "--dir=."]
+    pattern.each { p =>
+      args += [`--pattern=${p}`]
+    }
+    if (archive != "") {
+      args += [`--archive=${archive}`]
+    }
+
+    gh.container
+      .withWorkdir("/dl")
+      .withExec(command(args))
+      .directory("/dl")
+  }
+}
+
+type ReleaseAsset {
+  let release: Release!
+  name: String!
+  digest: String!
+  url: String!
+
+  let escapeGlob(s: String!): String! {
+    s.replace("[", "[[]").replace("*", "[*]").replace("?", "[?]").replace("\\", "[\\]")
+  }
+
+  """
+  Downloads the asset.
+  """
+  file: File! {
+    release.download([escapeGlob(name)]).file(name)
+  }
+}

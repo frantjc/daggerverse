@@ -404,7 +404,7 @@ func (m *Mise) Container(
 		WithEnvVariable("MISE_YES", "1").
 		WithWorkdir("/src").
 		With(func(r *dagger.Container) *dagger.Container {
-			include := []string{"mise.toml", "mise.*.toml"}
+			include := []string{"mise.toml", "mise.*.toml", "mise.lock", "mise.*.lock"}
 			if !noEnv {
 				include = append(include, m.Config.Env.Underscore.Source...)
 				include = append(include, m.Config.Env.Underscore.Path...)

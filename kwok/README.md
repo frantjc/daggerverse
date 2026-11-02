@@ -7,7 +7,7 @@ A Dagger module for spinning up a lightweight, simulated Kubernetes cluster usin
 Start a KWOK cluster:
 
 ```sh
-dagger api call -m github.com/frantjc/daggerverse/kwok cluster container as-service up
+dagger api call -m github.com/frantjc/daggerverse/kwok cluster service up
 ```
 
 And talk to it:
@@ -172,3 +172,18 @@ And talk to it:
   ]
 }
 ```
+
+### stages and objects
+
+kwok's [upstream stages](https://github.com/kubernetes-sigs/kwok/tree/main/kustomize/stage) can be configured by name (custom ones can be passed as `config` files), and objects can be baked into the cluster so that they exist as soon as it starts:
+
+```sh
+dagger api call -m github.com/frantjc/daggerverse/kwok \
+  cluster --stages node/fast,node/heartbeat-with-lease,pod/fast \
+  with-manifest --file kwok/testdata/node.yaml \
+  bind --container alpine/k8s:1.33.0 \
+  with-exec --args kubectl,get,nodes \
+  stdout
+```
+
+`bind` attaches the cluster as a service and points `$KUBECONFIG` at it.

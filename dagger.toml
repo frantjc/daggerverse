@@ -28,6 +28,10 @@ clients = [
 [sdks.dang.scopes.trivy]
 is-module = true
 
+[sdks.dang.scopes.kwok]
+is-module = true
+clients = ["./archive"]
+
 [sdks.dang.scopes.upx]
 is-module = true
 clients = [
@@ -46,10 +50,6 @@ is-module = true
 
 [sdks.go.scopes.homebrew]
 clients = ["./gh"]
-is-module = true
-
-[sdks.go.scopes.kwok]
-clients = ["./archive"]
 is-module = true
 
 [sdks.go.scopes.mise]

@@ -1,0 +1,286 @@
+"""
+Spins up lightweight, simulated Kubernetes clusters using KWOK.
+"""
+type Kwok {
+  let defaultImage = container.from("registry.k8s.io/kwok/cluster:v0.7.0-k8s.v1.33.0")
+
+  """
+  Finds the raw default of the given flag in `kwokctl --help` output, e.g.
+  "--etcd-binary" => `"/usr/local/bin/etcd"`.
+  """
+  let flagDefault(help: String!, flag: String!): String {
+    help.split("\n      --").each { chunk =>
+      let m = ("--" + chunk).match(`(?s)^(--\S+).*\(default ([^)]+)\)`)
+      if (m != null) {
+        if (m.captures[0] == flag) {
+          return m.captures[1]
+        }
+      }
+    }
+    null
+  }
+
+  """
+  Fetches the default binary for the given flag if it is an http(s) URL. A URL
+  fragment names the binary's path within a tarball.
+  """
+  let defaultBinary(help: String!, flag: String!): File {
+    let raw = flagDefault(help, flag)
+    if (raw == null) {
+      return null
+    }
+    let url = YAML.decode(raw) :: String!
+    if (!(url.hasPrefix("http://") or url.hasPrefix("https://"))) {
+      return null
+    }
+    let parts = url.split("#", limit: 2)
+    let file = http(parts[0] ?? url)
+    let fragment = parts[1] ?? ""
+    if (fragment == "") {
+      return file
+    }
+    let dir = archive.untar(file)
+    dir.directory(dir.name).file(fragment)
+  }
+
+  """
+  Returns the files of one of kwok's upstream stages, e.g. "pod/general".
+  """
+  let stageFiles(kustomize: Directory!, stage: String!): [File!]! {
+    let dir = kustomize.directory(`stage/${stage}`)
+    dir
+      .glob("*.yaml")
+      .filter { name => name != "kustomization.yaml" }
+      .map { name => dir.file(name) }
+  }
+
+  """
+  Creates a KWOK cluster.
+  """
+  cluster(
+    container: Container,
+    """
+    kwok configuration files, e.g. containing Stages.
+    """
+    config: [File!]! = [],
+    """
+    kwok's upstream stages to configure, e.g. "node/fast",
+    "node/heartbeat-with-lease", "pod/general". See
+    https://github.com/kubernetes-sigs/kwok/tree/main/kustomize/stage.
+    """
+    stages: [String!]! = [],
+    components: [String!]! = [],
+    controllerPort: Int! = 0,
+    disable: [String!]! = [],
+    disableQPSLimits: Boolean! = false,
+    enable: [String!]! = [],
+    enableCRDs: [String!]! = [],
+    kubeApiserverInsecurePort: Int! = 8080,
+    kubeAuditPolicy: File,
+    etcd: File,
+    jaeger: File,
+    kubeApiserver: File,
+    kubeScheduler: File,
+    kubeControllerManager: File,
+    kwokController: File,
+    metricsServer: File,
+    prometheus: File,
+  ): Cluster! {
+    let ctr = container ?? defaultImage
+    let help = ctr.withExec(["kwokctl", "create", "cluster", "--help"]).stdout
+
+    let enabledComponents = components
+    if (enabledComponents.isEmpty) {
+      let raw = flagDefault(help, "--components")
+      if (raw == null) {
+        raise "parse default components"
+      }
+      enabledComponents = YAML.decode(raw) :: [String!]!
+    }
+
+    let args = ["kwokctl", "create", "cluster", "--wait", "9s", "--runtime", "binary"]
+
+    components.each { c => args += ["--components", c] }
+
+    if (controllerPort != 0) {
+      ctr = ctr.withExposedPort(controllerPort, description: "kwok-controller")
+      args += ["--controller-port", toString(controllerPort)]
+    }
+
+    disable.each { d => args += ["--disable", d] }
+
+    if (disableQPSLimits) {
+      args += ["--disable-qps-limits"]
+    }
+
+    enable.each { e => args += ["--enable", e] }
+
+    enableCRDs.each { e => args += ["--enable-crds", e] }
+
+    let binaries = [
+      {{name: "etcd", file: etcd}},
+      {{name: "jaeger", file: jaeger}},
+      {{name: "kube-apiserver", file: kubeApiserver}},
+      {{name: "kube-scheduler", file: kubeScheduler}},
+      {{name: "kube-controller-manager", file: kubeControllerManager}},
+      {{name: "kwok-controller", file: kwokController}},
+      {{name: "metrics-server", file: metricsServer}},
+      {{name: "prometheus", file: prometheus}},
+    ]
+
+    binaries.each { binary =>
+      if (enabledComponents.contains(binary.name)) {
+        let flag = `--${binary.name}-binary`
+        let path = `/usr/local/bin/${binary.name}`
+        let file = binary.file ?? defaultBinary(help, flag)
+        if (file != null) {
+          # 0700
+          ctr = ctr.withFile(path, file, permissions: 448)
+          args += [flag, path]
+        }
+      }
+    }
+
+    if (kubeAuditPolicy != null) {
+      let path = "$HOME/.kwok/kube-audit-policy.yaml"
+      ctr = ctr.withFile(path, kubeAuditPolicy, expand: true)
+      args += ["--kube-audit-policy", path]
+    }
+
+    let configs = config
+    if (!stages.isEmpty) {
+      # e.g. "kwokctl version v0.7.0 go1.24.0 (linux/amd64)"
+      let version = ctr.withExec(["kwokctl", "--version"]).stdout.split(" ")[2] ?? ""
+      if (version == "") {
+        raise "parse kwokctl version"
+      }
+      let kustomize = git("https://github.com/kubernetes-sigs/kwok").ref(version).tree.directory("kustomize")
+      stages.each { stage => configs += stageFiles(kustomize, stage) }
+    }
+
+    configs.each { f, i =>
+      let path = `$HOME/.kwok/config/${i}.yaml`
+      ctr = ctr.withFile(path, f, expand: true)
+      args += ["--config", path]
+    }
+
+    Cluster(
+      ctr
+        .withExposedPort(kubeApiserverInsecurePort, description: "kube-apiserver")
+        .withExec(args, expand: true),
+      kubeApiserverInsecurePort,
+    )
+  }
+}
+
+"""
+A KWOK cluster.
+"""
+type Cluster {
+  container: Container!
+  let kubeApiserverInsecurePort: Int!
+
+  """
+  Starts the cluster, runs `kwokctl kubectl` against it with the given source
+  mounted at /tmp/kwok and stops it again, persisting any changes in the
+  cluster's state. Retries to wait out things that the cluster creates
+  asynchronously, e.g. the default ServiceAccount or CRDs being established.
+  """
+  let kubectl(source: Directory!, args: [String!]!): Cluster! {
+    let path = "/tmp/kwok"
+    let script = ```
+      kwokctl start cluster --wait 1m || exit 1
+      status=1
+      for delay in 1 2 4 8 16; do
+        if kwokctl kubectl "$@"; then
+          status=0
+          break
+        fi
+        sleep $delay
+      done
+      kwokctl stop cluster
+      exit $status
+    ```
+    container = container
+      .withMountedDirectory(path, source)
+      .withExec(["sh", "-c", script, "sh"] + args)
+      .withoutMount(path)
+    self
+  }
+
+  """
+  Applies a manifest to the cluster so that its objects exist as soon as the
+  cluster starts.
+  """
+  withManifest(file: File!): Cluster! {
+    kubectl(directory.withFile("manifest.yaml", file), ["apply", "-f", "/tmp/kwok/manifest.yaml"])
+  }
+
+  """
+  Applies a directory of manifests to the cluster so that their objects exist
+  as soon as the cluster starts.
+  """
+  withManifests(source: Directory!): Cluster! {
+    kubectl(source, ["apply", "-R", "-f", "/tmp/kwok"])
+  }
+
+  """
+  Applies a kustomization to the cluster so that its objects exist as soon as
+  the cluster starts.
+  """
+  withKustomization(source: Directory!): Cluster! {
+    kubectl(source, ["apply", "-k", "/tmp/kwok"])
+  }
+
+  """
+  Runs the cluster. Unlike the image's entrypoint, this does not re-run
+  `kwokctl create cluster`, which fails when CRDs are enabled.
+  """
+  service: Service! {
+    let script = ```
+      trap 'kwokctl stop cluster; exit 0' INT TERM
+      kwokctl start cluster || exit 1
+      while true; do
+        sleep 10
+        kwokctl start cluster > /dev/null 2>&1
+      done
+    ```
+    container.asService(args: ["sh", "-c", script])
+  }
+
+  """
+  Binds the cluster to the given container as a service under the given alias
+  and points $KUBECONFIG at it.
+  """
+  bind(container: Container!, alias: String! = "kwok"): Container! {
+    container
+      .withServiceBinding(alias, service)
+      .withEnvVariable("KUBECONFIG", "$HOME/.kube/config", expand: true)
+      .withFile("$KUBECONFIG", kubeConfig(alias: alias), expand: true)
+  }
+
+  """
+  Returns a kubeconfig for reaching the cluster when it is bound as a service
+  under the given alias.
+  """
+  kubeConfig(alias: String! = "kwok"): File! {
+    # TODO(frantjc): It would be nice to use the ~/.kube/config from the Service Container.
+    file(name: "config", contents: ```
+      apiVersion: v1
+      kind: Config
+      clusters:
+        - name: ${alias}
+          cluster:
+            server: http://${alias}:${kubeApiserverInsecurePort}
+      users:
+        - name: ${alias}
+          user: {}
+      contexts:
+        - name: ${alias}
+          context:
+            cluster: ${alias}
+            user: ${alias}
+      current-context: ${alias}
+    ```)
+  }
+}

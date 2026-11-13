@@ -124,7 +124,7 @@ type Steamcmd {
   neither reaches the module, nor the engine as plaintext, nor any cache.
   """
   let steamGuardCodeTool: File! {
-    let main = ```
+    let main = ```go
       package main
 
       import (

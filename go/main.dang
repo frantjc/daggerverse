@@ -31,6 +31,12 @@ type Go {
   """
   let from: Container
 
+  """
+  Workspace-root include patterns for files the module's commands need that
+  gomod's scan doesn't find, such as go:generate tools' configuration.
+  """
+  let include: [String!]!
+
   let mountPath = "/src"
 
   let workdir: String! {
@@ -75,9 +81,17 @@ type Go {
   }
 
   """
+  The module's sources, as gomod determines them, plus the include patterns.
+  """
+  let source(test: Boolean! = false, generate: Boolean! = false): Directory! {
+    gomod.at(path).source(ws, test: test, generate: generate, extra: include)
+  }
+
+  """
   The toolchain container with the module's sources, as gomod determines
-  them, mounted workspace-rooted, so that changesets are relative to the
-  workspace root and edits to unrelated files leave results cached.
+  them plus the include patterns, mounted workspace-rooted, so that
+  changesets are relative to the workspace root and edits to unrelated files
+  leave results cached.
   """
   let withSource(
     cgo: Boolean! = false,
@@ -85,7 +99,7 @@ type Go {
     generate: Boolean! = false,
   ): Container! {
     let ctr = toolchain(cgo)
-      .withDirectory(mountPath, gomod.at(path).source(ws, test: test, generate: generate))
+      .withDirectory(mountPath, source(test: test, generate: generate))
     if (test) {
       ctr = ctr.withDirectory(mountPath, gomod.at(path).testData(ws))
     }
@@ -96,11 +110,10 @@ type Go {
   The changes the command makes to the module's sources.
   """
   let changes(ctr: Container!, args: [String!]!, generate: Boolean! = false): Changeset! {
-    let src = gomod.at(path).source(ws, generate: generate)
     ctr
       .withExec(args, experimentalPrivilegedNesting: generate)
       .directory(mountPath)
-      .changes(src)
+      .changes(source(generate: generate))
   }
 
   """
@@ -126,6 +139,12 @@ type Go {
     exclude: [String!]! = [],
     gitignore: Boolean! = false,
     """
+    Workspace-root include patterns for files the module's commands need that
+    gomod's scan doesn't find, such as go:generate tools' configuration, e.g.
+    ["buf.yaml", "buf.gen.yaml", "api/proto/**"].
+    """
+    include: [String!]! = [],
+    """
     The module's directory, relative to the workspace root.
     """
     path: String! = ".",
@@ -140,6 +159,7 @@ type Go {
     let goVersion = gomod.at(path).goVersion(ws) ?? gomod.defaultGoVersion
 
     self.ws = ws
+    self.include = include
     self.path = path
     self.from = container
     self.moduleName = base(modulePath)
@@ -198,7 +218,7 @@ type Go {
         base: ctr.withWorkdir(workdir),
         image: if (from == null) gomod.goImage(series) else "",
         from: from,
-        source: gomod.at(path).source(ws),
+        source: source,
         headers: gomod.scan(ws).sync.file("_headers_.gohdr"),
         mountPath: mountPath,
         workdir: path,

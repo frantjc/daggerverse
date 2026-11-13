@@ -25,6 +25,12 @@ type Mise {
   either a string or a table, both of which mise.toml is full of, so yq does
   it instead.
   """
+  # TODO: replace wolfi + yq with TOML.decode (https://danglang.org/json-yaml)
+  # once the engine's Dang has vito/dang@16e19856, which makes Decoded a
+  # nameable type: decode into Map[Decoded!]! and cast each value with
+  # `(v! :: String!) rescue ...`. Engine v1.0.0-beta.26/27 pin Dang at
+  # 00dc3801 (v2.3.1-0.20261103042248) and lack it; dagger/dagger main has it
+  # since c44662db08 (bump to fcb2429) and b7a30f6f0e (bump to v2.4.1).
   let parseConfig(contents: String!): String! {
     let expr = ```
       {
@@ -220,15 +226,24 @@ type Mise {
   }
 
   """
-  Formats mise.toml with `mise fmt`. Needs no tools installed.
+  mise, without any tools installed, with the source at the working
+  directory. mise loads mise.toml's env for every command, and sources
+  `_.source` scripts with /bin/bash, so bash is installed too.
   """
-  fmt(): Changeset! @generate {
+  let tooling: Container! {
     wolfi
-      .container
+      .container(packages: ["bash"])
       .withFile("/usr/local/bin/mise", binary)
       .withEnvVariable("MISE_YES", "1")
       .withWorkdir("/src")
       .withDirectory(".", src)
+  }
+
+  """
+  Formats mise.toml with `mise fmt`. Needs no tools installed.
+  """
+  fmt(): Changeset! @generate {
+    tooling
       .withExec(["mise", "fmt", "--all"])
       .directory(".")
       .changes(src)
@@ -238,12 +253,7 @@ type Mise {
   Create or refresh lockfile versions, checksums, and download URLs with `mise.lock`.
   """
   lock(): Changeset! @generate {
-    wolfi
-      .container
-      .withFile("/usr/local/bin/mise", binary)
-      .withEnvVariable("MISE_YES", "1")
-      .withWorkdir("/src")
-      .withDirectory(".", src)
+    tooling
       .withExec(["mise", "lock"])
       .directory(".")
       .changes(src)

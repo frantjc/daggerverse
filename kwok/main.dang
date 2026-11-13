@@ -188,7 +188,7 @@ type Cluster {
   """
   let kubectl(source: Directory!, args: [String!]!): Cluster! {
     let path = "/tmp/kwok"
-    let script = ```
+    let script = ```sh
       kwokctl start cluster --wait 1m || exit 1
       status=1
       for delay in 1 2 4 8 16; do
@@ -237,7 +237,7 @@ type Cluster {
   `kwokctl create cluster`, which fails when CRDs are enabled.
   """
   service: Service! {
-    let script = ```
+    let script = ```sh
       trap 'kwokctl stop cluster; exit 0' INT TERM
       kwokctl start cluster || exit 1
       while true; do
@@ -265,7 +265,7 @@ type Cluster {
   """
   kubeConfig(alias: String! = "kwok"): File! {
     # TODO(frantjc): It would be nice to use the ~/.kube/config from the Service Container.
-    file(name: "config", contents: ```
+    file(name: "config", contents: ```yaml
       apiVersion: v1
       kind: Config
       clusters:

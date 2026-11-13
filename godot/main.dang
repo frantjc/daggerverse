@@ -1,0 +1,335 @@
+"""
+Exports Godot Engine projects.
+"""
+type Godot {
+  container: Container!
+  exportTemplates: Directory!
+  let version: String!
+  let flavor: String!
+
+  let workDir = "/tmp"
+
+  """
+  Escapes the characters that matter in a URL query value.
+  """
+  let queryEscape(s: String!): String! {
+    s
+      .replace("%", "%25")
+      .replace("+", "%2B")
+      .replace(" ", "+")
+      .replace("&", "%26")
+      .replace("=", "%3D")
+      .replace("#", "%23")
+      .replace("?", "%3F")
+      .replace("/", "%2F")
+  }
+
+  let downloadUrl(
+    version: String!,
+    flavor: String!,
+    slug: String!,
+    platform: String!,
+  ): String! {
+    let query = [
+      `version=${queryEscape(version)}`,
+      `flavor=${queryEscape(flavor)}`,
+      `slug=${queryEscape(slug)}`,
+      `platform=${queryEscape(platform)}`,
+    ]
+    "https://downloads.godotengine.org/?" + query.join("&")
+  }
+
+  new(
+    version: String! = "4.6.1",
+    flavor: String! = "stable",
+    container: Container,
+  ) {
+    let arch = Dagger.arch.oci
+    let platform = case (arch) {
+      "amd64" => "linux.64"
+      "arm64" => `linux.${arch}`
+      else => raise `unsupported architecture ${arch}`
+    }
+    let slug = case (arch) {
+      "amd64" => "linux.x86_64.zip"
+      else => `${platform}.zip`
+    }
+    let ext = case (arch) {
+      "amd64" => ".x86_64"
+      else => `.${arch}`
+    }
+
+    let zip = `${workDir}/${slug}`
+    let godot = wolfi
+      .container
+      .withFile(zip, http(downloadUrl(version, flavor, slug, platform)))
+      .withExec(["unzip", "-d", workDir, zip])
+      .file(`${workDir}/Godot_v${version}-${flavor}_linux${ext}`)
+    # Lazy: nothing is downloaded unless the container is used.
+    let ctr = container ?? wolfi
+      .container(packages: ["openssl", "zlib"])
+      .withEnvVariable("HOME", "/root")
+      .withFile("/usr/local/bin/godot", godot)
+
+    let templatesZip = `${workDir}/export_templates.tpz`
+    self.exportTemplates = wolfi
+      .container
+      .withFile(templatesZip, http(downloadUrl(
+        version,
+        flavor,
+        "export_templates.tpz",
+        "templates",
+      )))
+      .withExec(["unzip", "-d", workDir, templatesZip])
+      .directory(`${workDir}/templates`)
+
+    self.container = ctr
+    self.version = version
+    self.flavor = flavor
+    self
+  }
+
+  """
+  Reads whether the named preset in export_presets.cfg embeds its .pck into
+  the binary, raising if the preset or its options are missing.
+
+  export_presets.cfg is an INI-like ConfigFile whose string values may span
+  lines, e.g. a dedicated server's SSH deploy scripts, so lines inside a
+  string are skipped rather than parsed as section headers or keys.
+  """
+  let embedsPck(cfg: String!, preset: String!): Boolean! {
+    let sections = [] :: [String!]!
+    let entries = [] :: [{{section: String!, key: String!, value: String!}}!]!
+    let section = ""
+    let inString = false
+
+    cfg.split("\n").each { raw =>
+      let line = raw.trimSpace
+      let wasInString = inString
+      let quotes = line.replace("\\\\", "").replace("\\\"", "").split("\"").length - 1
+      if (quotes % 2 == 1) {
+        inString = !inString
+      }
+      if (wasInString) {
+        continue
+      }
+
+      let header = line.match(`^\[(.+)\]$`)
+      if (header != null) {
+        section = header.captures[0] ?? ""
+        sections += [section]
+        continue
+      }
+
+      let kv = line.match(`^([^=]+?)\s*=\s*(.*)$`)
+      if (kv != null) {
+        let value = kv.captures[1] ?? ""
+        if (value != "\"" and value.hasPrefix("\"") and value.hasSuffix("\"")) {
+          value = value.trimPrefix("\"").trimSuffix("\"")
+        }
+        entries += [{{section, key: kv.captures[0] ?? "", value}}]
+      }
+    }
+
+    let presets = entries.filter { e =>
+      e.key == "name"
+        and e.value != ""
+        and e.section.hasPrefix("preset.")
+        and !e.section.hasSuffix(".options")
+    }
+    if (presets.isEmpty) {
+      raise "no export presets found in export_presets.cfg"
+    }
+
+    let found = presets.find { e => e.value == preset }
+    if (found == null) {
+      let available = presets.map { e => e.value }.join(", ")
+      raise `export preset "${preset}" not found in export_presets.cfg (available: ${available})`
+    }
+
+    let options = found.section + ".options"
+    if (!sections.contains(options)) {
+      raise `export preset "${preset}" is missing options section "${options}"`
+    }
+
+    let embed = entries.find { e => e.section == options and e.key == "binary_format/embed_pck" }
+    if (embed == null) {
+      return false
+    }
+    ["1", "t", "T", "true", "TRUE", "True"].contains(embed.value)
+  }
+
+  """
+  Builds osslsigncode, which Godot uses to codesign Windows exports.
+  """
+  let osslsigncode(version: String!): File! {
+    let src = "/src"
+    wolfi
+      .container(packages: ["build-base", "cmake", "curl-dev", "openssl-dev", "pkgconf", "python3", "zlib-dev"])
+      .withMountedDirectory(src, git("https://github.com/mtrojnar/osslsigncode").ref(version).tree)
+      .withWorkdir(`${src}/build`)
+      .withExec(["cmake", "-S", "..", "-DCMAKE_INSTALL_PREFIX=/usr/local", "-DCMAKE_BUILD_TYPE=Release"])
+      .withExec(["cmake", "--build", "."])
+      .withExec(["cmake", "--install", "."])
+      .file("/usr/local/bin/osslsigncode")
+  }
+
+  let exportAs(
+    kind: String!,
+    src: Directory!,
+    preset: String!,
+    path: String!,
+    osslsigncodeVersion: String!,
+    scriptEncryptionKey: Secret,
+    windowsCodesignIdentityType: String!,
+    windowsCodesignIdentity: File,
+    windowsCodesignPassword: Secret,
+  ): Export! {
+    let ctr = container.withWorkdir("/src").withMountedDirectory(".", src)
+
+    let embedPck = embedsPck(ctr.file("export_presets.cfg").contents, preset)
+
+    let xdgDataHome = ctr.envVariable("XDG_DATA_HOME") ?? ""
+    if (xdgDataHome == "") {
+      xdgDataHome = (ctr.envVariable("HOME") ?? "") + "/.local/share"
+    }
+
+    ctr = ctr.withDirectory(
+      `${xdgDataHome}/godot/export_templates/${version}.${flavor}`,
+      exportTemplates,
+      expand: true,
+    )
+
+    if (scriptEncryptionKey != null) {
+      if (embedPck) {
+        raise "cannot both embed pck and encrypt"
+      }
+      ctr = ctr.withSecretVariable("GODOT_SCRIPT_ENCRYPTION_KEY", scriptEncryptionKey)
+    }
+
+    if (windowsCodesignIdentityType != "") {
+      ctr = ctr.withEnvVariable("GODOT_WINDOWS_CODESIGN_IDENTITY_TYPE", windowsCodesignIdentityType)
+    }
+
+    if (windowsCodesignIdentity != null) {
+      let identityPath = "/tmp/windows-codesign-identity"
+      ctr = ctr
+        .withFile("/usr/local/bin/osslsigncode", osslsigncode(osslsigncodeVersion))
+        .withMountedFile(identityPath, windowsCodesignIdentity)
+        .withEnvVariable("GODOT_WINDOWS_CODESIGN_IDENTITY", identityPath)
+    }
+
+    if (windowsCodesignPassword != null) {
+      ctr = ctr.withSecretVariable("GODOT_WINDOWS_CODESIGN_PASSWORD", windowsCodesignPassword)
+    }
+
+    let exported = ctr.withExec(["godot", "--headless", `--export-${kind}`, preset, path])
+
+    if (embedPck) {
+      return Export(binary: exported.file(path), pck: null)
+    }
+
+    # The .pck is named after the binary, without its extension.
+    let pck = path.replaceMatches(`\.[^./]*$`, "") + ".pck"
+    Export(binary: exported.file(path), pck: exported.file(pck))
+  }
+
+  """
+  Exports the project using the named preset from its export_presets.cfg in
+  release mode.
+  """
+  exportRelease(
+    """
+    The Godot project.
+    """
+    src: Directory!,
+    """
+    The name of the export preset, e.g. "Linux/X11".
+    """
+    preset: String!,
+    """
+    Where to export the binary to, relative to the project.
+    """
+    path: String!,
+    """
+    The version of osslsigncode to codesign Windows exports with.
+    """
+    osslsigncodeVersion: String! = "2.13",
+    """
+    The key to encrypt scripts with. Incompatible with an embedded .pck.
+    """
+    scriptEncryptionKey: Secret,
+    windowsCodesignIdentityType: String! = "",
+    windowsCodesignIdentity: File,
+    windowsCodesignPassword: Secret,
+  ): Export! {
+    exportAs(
+      "release",
+      src,
+      preset,
+      path,
+      osslsigncodeVersion,
+      scriptEncryptionKey,
+      windowsCodesignIdentityType,
+      windowsCodesignIdentity,
+      windowsCodesignPassword,
+    )
+  }
+
+  """
+  Exports the project using the named preset from its export_presets.cfg in
+  debug mode.
+  """
+  exportDebug(
+    """
+    The Godot project.
+    """
+    src: Directory!,
+    """
+    The name of the export preset, e.g. "Linux/X11".
+    """
+    preset: String!,
+    """
+    Where to export the binary to, relative to the project.
+    """
+    path: String!,
+    """
+    The version of osslsigncode to codesign Windows exports with.
+    """
+    osslsigncodeVersion: String! = "2.13",
+    """
+    The key to encrypt scripts with. Incompatible with an embedded .pck.
+    """
+    scriptEncryptionKey: Secret,
+    windowsCodesignIdentityType: String! = "",
+    windowsCodesignIdentity: File,
+    windowsCodesignPassword: Secret,
+  ): Export! {
+    exportAs(
+      "debug",
+      src,
+      preset,
+      path,
+      osslsigncodeVersion,
+      scriptEncryptionKey,
+      windowsCodesignIdentityType,
+      windowsCodesignIdentity,
+      windowsCodesignPassword,
+    )
+  }
+}
+
+"""
+An exported Godot project.
+"""
+type Export {
+  """
+  The exported binary.
+  """
+  binary: File!
+
+  """
+  The exported .pck, unless it is embedded into the binary.
+  """
+  pck: File
+}

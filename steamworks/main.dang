@@ -1,0 +1,346 @@
+"""
+Steamworks tooling.
+"""
+type Steamworks {
+  """
+  The Steamworks SDK source.
+  """
+  sdk: Directory!
+
+  let defaultSteamcmdImage = container.from("docker.io/steamcmd/steamcmd")
+
+  new(
+    """
+    The Steamworks SDK source. Defaults to the head of rlabrecque/SteamworksSDK.
+    """
+    sdk: Directory,
+  ) {
+    self.sdk = sdk ?? git("https://github.com/rlabrecque/SteamworksSDK").head.tree
+    self
+  }
+
+  """
+  Returns steamcmd, logged in as a Steam account if a password is given.
+  """
+  @cache(policy: FunctionCachePolicy.PER_SESSION)
+  steamcmd(
+    """
+    The steamcmd container. Defaults to docker.io/steamcmd/steamcmd.
+    """
+    container: Container,
+    """
+    The Steam account to log in as.
+    """
+    username: String! = "anonymous",
+    """
+    The password of the Steam account. Without it, steamcmd logs in without
+    one, which is only enough for commands that don't need a real account.
+    """
+    password: Secret,
+    """
+    The Steam Guard code of the Steam account, if it has one. Ignored without
+    a password. Takes precedence over the shared secret.
+    """
+    steamGuardCode: Secret,
+    """
+    The base64-encoded shared secret of the Steam account's Steam Guard mobile
+    authenticator, used to generate a fresh Steam Guard code (TOTP). Ignored
+    without a password.
+    """
+    sharedSecret: Secret,
+    """
+    The contents of the config.vdf of a previously authorized steamcmd
+    session, so that email-based Steam Guard is not prompted for again.
+    """
+    configVdf: Secret,
+  ): Steamcmd! {
+    Steamcmd(
+      container: container ?? defaultSteamcmdImage,
+      username: username,
+      password: password,
+      steamGuardCode: steamGuardCode,
+      sharedSecret: if (steamGuardCode == null) sharedSecret else null,
+      configVdf: configVdf,
+    )
+  }
+
+  """
+  Creates a Steam depot that maps files from the build content.
+  """
+  depot(
+    """
+    The depot ID.
+    """
+    depotId: Int!,
+    """
+    A glob, relative to the content directory, of the files to include.
+    Defaults to every file.
+    """
+    path: String! = "*",
+    """
+    Include matching files in subdirectories.
+    """
+    recursive: Boolean! = false,
+  ): Depot! {
+    Depot(depotId: depotId, path: path, recursive: recursive)
+  }
+}
+
+"""
+Maps files from the build content into a Steam depot.
+"""
+type Depot {
+  """
+  The depot ID.
+  """
+  depotId: Int!
+
+  """
+  A glob, relative to the content directory, of the files to include.
+  """
+  path: String! = "*"
+
+  """
+  Whether matching files in subdirectories are included.
+  """
+  recursive: Boolean! = false
+}
+
+"""
+steamcmd, logged in as a Steam account if a password is given.
+"""
+type Steamcmd {
+  let container: Container!
+  let username: String!
+  let password: Secret
+  let steamGuardCode: Secret
+  let sharedSecret: Secret
+  let configVdf: Secret
+
+  """
+  A static binary that prints the current Steam Guard code (TOTP) for the
+  base64-encoded shared secret in $STEAM_SHARED_SECRET. It runs inside the
+  steamcmd exec, so neither the shared secret nor the code ever leaves it:
+  neither reaches the module, nor the engine as plaintext, nor any cache.
+  """
+  let steamGuardCodeTool: File! {
+    let main = ```
+      package main
+
+      import (
+      	"crypto/hmac"
+      	"crypto/sha1"
+      	"encoding/base64"
+      	"encoding/binary"
+      	"fmt"
+      	"os"
+      	"strings"
+      	"time"
+      )
+
+      const alphabet = "23456789BCDFGHJKMNPQRTVWXY"
+
+      func main() {
+      	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("STEAM_SHARED_SECRET")))
+      	if err != nil {
+      		fmt.Fprintln(os.Stderr, "decode shared secret:", err)
+      		os.Exit(1)
+      	}
+
+      	mac := hmac.New(sha1.New, key)
+      	_ = binary.Write(mac, binary.BigEndian, uint64(time.Now().Unix()/30))
+      	sum := mac.Sum(nil)
+      	offset := sum[len(sum)-1] & 0x0f
+      	value := binary.BigEndian.Uint32(sum[offset:offset+4]) & 0x7fffffff
+
+      	code := make([]byte, 5)
+      	for i := range code {
+      		code[i] = alphabet[value%uint32(len(alphabet))]
+      		value /= uint32(len(alphabet))
+      	}
+
+      	fmt.Print(string(code))
+      }
+    ```
+
+    Dagger
+      .container
+      .from("docker.io/library/golang:1.27-alpine")
+      .withNewFile("/src/main.go", main)
+      .withWorkdir("/src")
+      .withEnvVariable("CGO_ENABLED", "0")
+      .withExec(["go", "mod", "init", "steam-guard-code"])
+      .withExec(["go", "build", "-trimpath", "-ldflags=-s -w", "-o", "/out/steam-guard-code", "."])
+      .file("/out/steam-guard-code")
+  }
+
+  let contentRoot = "/content"
+  let buildOutput = "/output"
+  let vdfPath = "/tmp/app_build.vdf"
+
+  # drm_wrap flags.
+  let drmFlagCompatibility = 6
+  let drmFlagSkipDebuggerCheck = 32
+
+  """
+  Runs steamcmd in the given container, logged in with the credentials, if
+  any, followed by args. Secret variables can't be expanded, so a shell does
+  the substitution instead.
+  """
+  let exec(ctr: Container!, args: [String!]!): Container! {
+    let vdf = configVdf
+    if (vdf != null) {
+      # Which of these steamcmd reads depends on how it was installed, so
+      # cover both.
+      ["$HOME/Steam/config/config.vdf", "$HOME/.local/share/Steam/config/config.vdf"].each { p =>
+        ctr = ctr.withMountedSecret(p, vdf, expand: true)
+      }
+    }
+
+    let login = "exec steamcmd +login \"$STEAMCMD_USERNAME\""
+    let prelude = ""
+    ctr = ctr.withEnvVariable("STEAMCMD_USERNAME", username)
+
+    let pw = password
+    if (pw != null) {
+      login += " \"$STEAMCMD_PASSWORD\""
+      ctr = ctr.withSecretVariable("STEAMCMD_PASSWORD", pw)
+
+      let code = steamGuardCode
+      let secret = sharedSecret
+      if (code != null) {
+        login += " \"$STEAMCMD_GUARD_CODE\""
+        ctr = ctr.withSecretVariable("STEAMCMD_GUARD_CODE", code)
+      } else if (secret != null) {
+        # Generated right before logging in, so the code is always fresh.
+        prelude = "STEAMCMD_GUARD_CODE=\"$(/usr/local/bin/steam-guard-code)\" || exit 1\n"
+        login += " \"$STEAMCMD_GUARD_CODE\""
+        ctr = ctr
+          .withMountedFile("/usr/local/bin/steam-guard-code", steamGuardCodeTool)
+          .withSecretVariable("STEAM_SHARED_SECRET", secret)
+      }
+    }
+
+    ctr.withExec(["sh", "-c", prelude + login + " \"$@\"", "sh"] + args)
+  }
+
+  """
+  Renders the app_build.vdf for steamcmd's run_app_build.
+  """
+  let appBuildVdf(appId: Int!, depots: [Depot!]!, desc: String!, branch: String!): String! {
+    let setLive = if (branch == "") "" else `"SetLive" "${branch}"`
+    let depotsVdf = depots.map { depot =>
+      let path = if (depot.path == "") "*" else depot.path
+      let recursive = if (depot.recursive) "1" else "0"
+      ```
+        "${depot.depotId}"
+        {
+          "FileMapping"
+          {
+            "LocalPath" "${path}"
+            "DepotPath" "."
+            "recursive" "${recursive}"
+          }
+        }
+      ```
+    }
+
+    # KeyValues is whitespace-insensitive, so the indentation of interpolated
+    # lines doesn't matter.
+    ```
+      "AppBuild"
+      {
+        "AppID" "${appId}"
+        "Desc" "${desc}"
+        ${setLive}
+        "ContentRoot" "${contentRoot}"
+        "BuildOutput" "${buildOutput}"
+        "Depots"
+        {
+          ${depotsVdf.join("\n")}
+        }
+      }
+    ```
+  }
+
+  """
+  Uploads content to Steam using steamcmd's run_app_build. The build output
+  (logs and cache files) is kept in a cache volume per app ID so that
+  steamcmd's build cache is reused between builds.
+  """
+  appBuild(
+    """
+    The ID of the app to build.
+    """
+    appId: Int!,
+    """
+    The directory of files to upload.
+    """
+    content: Directory!,
+    """
+    The depots to build and the files that belong in each.
+    """
+    depots: [Depot!]!,
+    """
+    A description of the build, visible only to the developer.
+    """
+    desc: String! = "",
+    """
+    The beta branch to automatically set the build live on once uploaded.
+    Without it, the build is uploaded but not set live on any branch. Steam
+    does not allow automatically setting builds live on the default branch.
+    """
+    branch: String! = "",
+  ): Void {
+    let ctr = container
+      .withNewFile(vdfPath, appBuildVdf(appId, depots, desc, branch))
+      .withMountedDirectory(contentRoot, content)
+      .withMountedCache(buildOutput, cacheVolume(`steamworks-app-build-${appId}`))
+
+    exec(ctr, ["+run_app_build", vdfPath, "+quit"]).sync
+
+    null
+  }
+
+  """
+  Wraps a Windows executable with Steam DRM using steamcmd's drm_wrap and the
+  drmtoolp tool, returning the wrapped executable.
+  """
+  drmWrap(
+    """
+    The ID of the app the executable belongs to.
+    """
+    appId: Int!,
+    """
+    The plaintext executable to wrap. .NET applications are not supported.
+    """
+    executable: File!,
+    """
+    Disable obfuscation. Apply this before layering other DRM solutions.
+    """
+    compatibility: Boolean! = false,
+    """
+    Skip debugger checks.
+    """
+    skipDebuggerCheck: Boolean! = false,
+  ): File! {
+    let name = executable.name
+    let src = `/in/${name}`
+    let out = `/out/${name}`
+
+    # The flags are distinct bits, so adding them is a bitwise OR.
+    let flags = 0
+    if (compatibility) {
+      flags += drmFlagCompatibility
+    }
+    if (skipDebuggerCheck) {
+      flags += drmFlagSkipDebuggerCheck
+    }
+
+    let ctr = container
+      .withMountedFile(src, executable)
+      .withDirectory("/out", directory)
+
+    exec(ctr, ["+drm_wrap", toString(appId), src, out, "drmtoolp", toString(flags), "+quit"]).file(out)
+  }
+}

@@ -1,0 +1,262 @@
+"""
+Installs and activates tools managed by mise.
+"""
+type Mise {
+  """
+  The relevant parts of mise.toml, normalized to JSON by parseConfig.
+  """
+  let config: String!
+  let src: Directory!
+
+  """
+  The version of mise to use when mise.toml sets no min_version.
+  """
+  let defaultVersion: String!
+
+  """
+  Maps tool short names to their backends so that `mise tool --json` only has
+  to be run for tools not listed here.
+  """
+  let knownRegistry = ["ansible-core": "pipx", "azure-cli": "pipx", "go": "core", "node": "core", "opentofu": "aqua", "pnpm": "aqua"]
+
+  """
+  Normalizes the parts of a mise.toml that matter here into JSON of a fixed
+  shape. Dang's TOML decoding can't materialize maps, nor values that are
+  either a string or a table, both of which mise.toml is full of, so yq does
+  it instead.
+  """
+  let parseConfig(contents: String!): String! {
+    let expr = ```
+      {
+        "minVersion": ((.min_version | select(tag == "!!str")) // (.min_version | select(tag == "!!map") | .hard) // ""),
+        "tools": ((.tools // {}) | to_entries | map({"name": .key, "depends": ([(.value | select(tag == "!!map") | .depends) // []] | flatten | map(select(tag == "!!str")))})),
+        "toolAlias": ((.tool_alias // {}) | to_entries | map(select(.value | tag == "!!str") | {"name": .key, "value": .value})),
+        "envSource": ([.env._.source // []] | flatten | map(select(tag == "!!str"))),
+        "envPath": ([.env._.path // []] | flatten | map(select(tag == "!!str")))
+      }
+    ```
+    wolfi
+      .container(packages: ["yq"])
+      .withNewFile("/mise.toml", contents)
+      .withExec(["yq", "-p", "toml", "-o", "json", "-I", "0", expr, "/mise.toml"])
+      .stdout
+  }
+
+  let parsedConfig: {{minVersion: String!, tools: [{{name: String!, depends: [String!]!}}!]!, toolAlias: [{{name: String!, value: String!}}!]!, envSource: [String!]!, envPath: [String!]!}}! {
+    JSON.decode(config)
+  }
+
+  """
+  Normalizes a version as semver does, e.g. "v2026.5" => "2026.5.0".
+  """
+  let normalizeVersion(version: String!): String! {
+    let parts = version.trimPrefix("v").split(".")
+    if (parts.length == 1) {
+      parts += ["0", "0"]
+    } else if (parts.length == 2) {
+      parts += ["0"]
+    }
+    parts.join(".")
+  }
+
+  new(
+    ws: Workspace!,
+    exclude: [String!]! = [],
+    gitignore: Boolean! = false,
+    path: String! = ".",
+    """
+    The version of mise to use, unless mise.toml sets min_version.
+    """
+    version: String! = "2026.5.15",
+  ) {
+    self.config = parseConfig(ws.directory(path).file("mise.toml").contents)
+    self.defaultVersion = version
+    self.src = ws.directory(path, exclude: exclude, gitignore: gitignore)
+    self
+  }
+
+  """
+  Returns the backend of the tool, e.g. "aqua", "core", "go", resolving
+  aliases and asking mise for tools that aren't in the known registry.
+  """
+  let backendOf(probe: Container!, name: String!): String! {
+    let resolved = parsedConfig.toolAlias.find { a => a.name == name }.value ?? name
+
+    let parts = resolved.split(":", limit: 2)
+    if (parts.length == 2) {
+      return parts[0] ?? ""
+    }
+
+    let known = knownRegistry[resolved]
+    if (known != null) {
+      return known
+    }
+
+    let info = JSON.decode(probe.withExec(["mise", "tool", "--json", resolved]).stdout) :: {{backend: String!}}!
+    info.backend.split(":", limit: 2)[0] ?? ""
+  }
+
+  """
+  Returns a container with mise and the tools from mise.toml installed and
+  activated, with the source mounted at the working directory.
+  """
+  container(
+    """
+    Don't load environment variables from mise.toml (MISE_NO_ENV).
+    """
+    noEnv: Boolean! = false,
+    """
+    Don't run hooks from mise.toml (MISE_NO_HOOKS).
+    """
+    noHooks: Boolean! = false,
+    """
+    Install only these tools. Defaults to all of them.
+    """
+    tools: [String!]! = [],
+  ): Container! {
+    let cfg = parsedConfig
+    let selected(name: String!): Boolean! { tools.isEmpty or tools.contains(name) }
+    let usesTool(name: String!): Boolean! {
+      selected(name) and cfg.tools.any { t => t.name == name }
+    }
+
+    let mise = binary
+
+    let probe = wolfi.container.withFile("/usr/local/bin/mise", mise)
+
+    # Whether a selected tool that doesn't itself depend on the given tool
+    # uses one of the backends, and so needs that tool installed by the
+    # system rather than by mise.
+    let usesBackendsWithoutDepends(backends: [String!]!, depends: String!): Boolean! {
+      cfg.tools.any { t =>
+        selected(t.name) and !t.depends.contains(depends) and backends.contains(backendOf(
+          probe,
+          t.name,
+        ))
+      }
+    }
+
+    let packages = ["git", "bash"]
+    if (usesBackendsWithoutDepends(["pipx", "pypi"], "uv")) {
+      packages += ["uv"]
+    }
+    if (usesBackendsWithoutDepends(["go"], "go")) {
+      packages += ["go-1.27"]
+    }
+    if (usesBackendsWithoutDepends(["npm"], "node")) {
+      packages += ["npm"]
+    }
+    if (usesTool("opentofu")) {
+      packages += ["curl"]
+    }
+    if (usesTool("go")) {
+      packages += ["gcc"]
+    }
+    if (usesTool("node") or usesTool("pnpm")) {
+      packages += ["libatomic", "libstdc++"]
+    }
+
+    let ctr = wolfi
+      .container(packages: packages.uniq)
+      .withEnvVariable("HOME", "/root")
+      .withEnvVariable("PATH", "$HOME/.local/bin:$PATH", expand: true)
+      .withFile("$HOME/.local/bin/mise", mise, expand: true)
+
+    let cacheDir = ctr.withExec(["mise", "cache", "path"]).stdout.trimSpace
+    ctr = ctr.withMountedCache(cacheDir, cacheVolume("mise-cache"), expand: true)
+
+    let dataDir = ctr.envVariable("MISE_DATA_DIR") ?? ""
+    if (dataDir == "") {
+      let xdgDataHome = ctr.envVariable("XDG_DATA_HOME") ?? ""
+      if (xdgDataHome == "") {
+        xdgDataHome = (ctr.envVariable("HOME") ?? "") + "/.local/share"
+      }
+      dataDir = xdgDataHome + "/mise"
+    }
+    ctr = ctr
+      .withMountedCache(dataDir, cacheVolume("mise-data"))
+      .withEnvVariable("PATH", `${dataDir}/shims:$PATH`, expand: true)
+
+    if (noHooks) {
+      ctr = ctr.withEnvVariable("MISE_NO_HOOKS", "1")
+    }
+    if (noEnv) {
+      ctr = ctr.withEnvVariable("MISE_NO_ENV", "1")
+    }
+
+    # Install with only what mise reads mounted, so that installs stay cached
+    # across unrelated changes to the source.
+    let include = ["mise.toml", "mise.*.toml", "mise.lock", "mise.*.lock"]
+    if (!noEnv) {
+      include += cfg.envSource + cfg.envPath
+    }
+
+    ctr = ctr
+      .withEnvVariable("MISE_YES", "1")
+      .withWorkdir("/src")
+      .withMountedDirectory(".", src.filter(include: include.uniq))
+      .withExec(["mise", "install"] + tools)
+      .withMountedDirectory(".", src)
+
+    let env = ctr
+      .withExec(["mise", "env"])
+      .stdout
+      .split("\n")
+      .map { line => line.trimPrefix("export ") }
+      .join("\n")
+
+    ctr.withEnvFileVariables(file("mise.env", env).asEnvFile)
+  }
+
+  """
+  The mise binary at mise.toml's min_version, else the default version.
+  """
+  let binary: File! {
+    let cfg = parsedConfig
+    let version = normalizeVersion(if (cfg.minVersion == "") defaultVersion else cfg.minVersion)
+    archive
+      .untar(http(`http://github.com/jdx/mise/releases/download/v${version}/mise-v${version}-linux-${arch.microsoft}.tar.gz`))
+      .file("mise/bin/mise")
+  }
+
+  """
+  Formats mise.toml with `mise fmt`. Needs no tools installed.
+  """
+  fmt(
+    """
+    Format every mise config file in the source, not just mise.toml.
+    """
+    all: Boolean! = false,
+  ): Changeset! @generate {
+    let args = ["mise", "fmt"]
+    if (all) {
+      args += ["--all"]
+    }
+
+    wolfi
+      .container
+      .withFile("/usr/local/bin/mise", binary)
+      .withWorkdir("/src")
+      .withDirectory(".", src)
+      .withExec(args)
+      .directory(".")
+      .changes(src)
+  }
+
+  """
+  Create or refresh lockfile versions, checksums, and download URLs with `mise.lock`.
+  """
+  lock(
+  ): Changeset! @generate {
+    let args = ["mise", "lock"]
+
+    wolfi
+      .container
+      .withFile("/usr/local/bin/mise", binary)
+      .withWorkdir("/src")
+      .withDirectory(".", src)
+      .withExec(args)
+      .directory(".")
+      .changes(src)
+  }
+}

@@ -9,3 +9,9 @@ Install tools from a project's `mise.toml` and open a terminal:
 ```sh
 dagger api call -m github.com/frantjc/daggerverse/mise container terminal
 ```
+
+Format `mise.toml` (pass `--all` for every mise config file):
+
+```sh
+dagger api call -m github.com/frantjc/daggerverse/mise fmt
+```

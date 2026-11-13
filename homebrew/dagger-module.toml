@@ -1,8 +1,8 @@
 name = "homebrew"
-engineVersion = "v1.0.0-beta.23"
+engineVersion = "v1.0.0-beta.26"
 
 [runtime]
-  source = "go"
+  source = "dang"
 
 [[dependencies]]
   name = "gh"

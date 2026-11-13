@@ -1,0 +1,297 @@
+"""
+Builds, tests, and maintains Go projects.
+"""
+type Go {
+  """
+  The Go toolchain with the workspace mounted at /src and the module's
+  directory as the working directory.
+  """
+  container: Container!
+
+  let ws: Workspace!
+
+  """
+  The module's directory, relative to the workspace root.
+  """
+  let path: String!
+
+  """
+  The last element of the module path, which `go build` names a binary of
+  the module's root package after.
+  """
+  let moduleName: String!
+
+  """
+  The Go version series the module's toolchain image is for, e.g. "1.26".
+  """
+  let series: String!
+
+  """
+  The toolchain container, if one was given.
+  """
+  let from: Container
+
+  let mountPath = "/src"
+
+  let workdir: String! {
+    if (path == ".") mountPath else `${mountPath}/${path}`
+  }
+
+  """
+  Returns the last element of a slash-separated path, like Go's
+  filepath.Base.
+  """
+  let base(path: String!): String! {
+    let trimmed = path.trimRight("/")
+    if (trimmed == "") {
+      return if (path == "") "." else "/"
+    }
+    trimmed.split("/").takeLast(1)[0] ?? trimmed
+  }
+
+  """
+  Returns all but the last element of a slash-separated path, like Go's
+  filepath.Dir.
+  """
+  let dir(path: String!): String! {
+    let parts = path.split("/")
+    if (parts.length < 2) {
+      return "."
+    }
+    let d = parts.dropLast(1).join("/")
+    if (d == "") "/" else d
+  }
+
+  """
+  The toolchain container before any source is mounted, with the Go caches
+  shared with every other user of gomod. A C toolchain is installed for cgo
+  unless the container was given.
+  """
+  let toolchain(cgo: Boolean!): Container! {
+    if (from != null) {
+      return gomod.withGoCaches(from.withoutEntrypoint)
+    }
+    gomod.goContainer(series, cgo: cgo)
+  }
+
+  """
+  The toolchain container with the module's sources, as gomod determines
+  them, mounted workspace-rooted, so that changesets are relative to the
+  workspace root and edits to unrelated files leave results cached.
+  """
+  let withSource(
+    cgo: Boolean! = false,
+    test: Boolean! = false,
+    generate: Boolean! = false,
+  ): Container! {
+    let ctr = toolchain(cgo)
+      .withDirectory(mountPath, gomod.at(path).source(ws, test: test, generate: generate))
+    if (test) {
+      ctr = ctr.withDirectory(mountPath, gomod.at(path).testData(ws))
+    }
+    ctr.withWorkdir(workdir)
+  }
+
+  """
+  The changes the command makes to the module's sources.
+  """
+  let changes(ctr: Container!, args: [String!]!, generate: Boolean! = false): Changeset! {
+    let src = gomod.at(path).source(ws, generate: generate)
+    ctr
+      .withExec(args, experimentalPrivilegedNesting: generate)
+      .directory(mountPath)
+      .changes(src)
+  }
+
+  """
+  `ctr` with the tool installed, unless it already has one. Tools are built
+  in gomod's pinned tool builder, so a tool is built once for every project
+  and Go version rather than once per module, and stays cached across edits.
+  A tool may require a newer Go than the builder's; go fetches it.
+  """
+  let withTool(ctr: Container!, pkg: String!, version: String!): Container! {
+    let name = base(pkg)
+    let binary = gomod
+      .toolBuilder
+      .withEnvVariable("GOTOOLCHAIN", "auto")
+      .withEnvVariable("CGO_ENABLED", "0")
+      .withEnvVariable("GOBIN", "/tmp/bin")
+      .withExec(["go", "install", `${pkg}@${version}`])
+      .file(`/tmp/bin/${name}`)
+    gomod.withTool(ctr, name, binary)
+  }
+
+  new(
+    ws: Workspace!,
+    exclude: [String!]! = [],
+    gitignore: Boolean! = false,
+    """
+    The module's directory, relative to the workspace root.
+    """
+    path: String! = ".",
+    container: Container,
+  ) {
+    let goMod = ws.directory(path).file("go.mod").contents
+    let modulePath = (goMod.match(`(?m)^module\s+(\S+)`).captures[0] ?? "").trim("\"`")
+    if (modulePath == "") {
+      raise "parse module path from go.mod"
+    }
+
+    let goVersion = gomod.at(path).goVersion(ws) ?? gomod.defaultGoVersion
+
+    self.ws = ws
+    self.path = path
+    self.from = container
+    self.moduleName = base(modulePath)
+    # A go directive is a minimum, so use the newest patch of its minor
+    # series: fewer distinct images to pull and cache, and a go.mod bumped to
+    # a patch with no image yet still works.
+    self.series = goVersion.match(`^\d+\.\d+`).string ?? goVersion
+
+    self.container = toolchain(false)
+      .withWorkdir(workdir)
+      .withMountedDirectory(
+        mountPath,
+        ws.directory("/", include: ["**/go.mod", "**/go.sum"]),
+      )
+      .withExec(["go", "mod", "download"])
+      .withMountedDirectory(
+        mountPath,
+        ws.directory("/", exclude: exclude, gitignore: gitignore),
+      )
+    self
+  }
+
+  """
+  Builds a binary.
+  """
+  build(
+    pkg: String! = "./",
+    ldflags: String! = "-s -w",
+    cgo: Boolean! = false,
+    goarch: String! = "",
+    goos: String! = "",
+  ): File! {
+    let name = case {
+      pkg.hasSuffix(".go") => base(dir(pkg))
+      pkg == "./" or pkg == "." => moduleName
+      else => base(pkg)
+    }
+
+    let ctr = toolchain(cgo)
+    if (!cgo) {
+      ctr = ctr.withEnvVariable("CGO_ENABLED", "0")
+    }
+    if (goos != "") {
+      ctr = ctr.withEnvVariable("GOOS", goos)
+    }
+    if (goarch != "") {
+      ctr = ctr.withEnvVariable("GOARCH", goarch)
+    }
+
+    # gobuild replays `go build -n` with one exec per package, so each
+    # package's compile is cached as a result of its own: an edit recompiles
+    # only the packages it reaches, and results, unlike cache volumes, are
+    # shared between engines through a remote cache.
+    gobuild(toolImage: gomod.goImage(gomod.scannerVersion))
+      .binary(
+        base: ctr.withWorkdir(workdir),
+        image: if (from == null) gomod.goImage(series) else "",
+        from: from,
+        source: gomod.at(path).source(ws),
+        headers: gomod.scan(ws).sync.file("_headers_.gohdr"),
+        mountPath: mountPath,
+        workdir: path,
+        pkg: pkg,
+        output: name,
+        flags: ["-trimpath", "-ldflags=" + ldflags],
+      )
+      .file(name)
+  }
+
+  """
+  Runs tests, reporting each as a span.
+  """
+  test(
+    pkg: String! = "./...",
+    race: Boolean! = false,
+    cgo: Boolean! = false,
+    tags: [String!]! = [],
+  ): Void @check {
+    let args = ["otelgotest"]
+    if (race) {
+      args += ["-race"]
+    }
+    if (!tags.isEmpty) {
+      args += ["-tags", tags.join(",")]
+    }
+    args += [pkg]
+
+    let cgoEnabled = cgo or race
+
+    withTool(
+      withSource(cgo: cgoEnabled, test: true),
+      "github.com/dagger/otel-go/cmd/otelgotest",
+      "main",
+    )
+      .withEnvVariable("CGO_ENABLED", if (cgoEnabled) "1" else "0")
+      .withExec(args, experimentalPrivilegedNesting: true)
+      .sync
+
+    null
+  }
+
+  """
+  Formats source code.
+  """
+  fmt(pkg: String! = "./..."): Changeset! @generate {
+    changes(withSource, ["go", "fmt", pkg])
+  }
+
+  """
+  Reports known vulnerabilities that affect the code.
+  """
+  vulncheck(pkg: String! = "./...", version: String! = "latest"): Void @check {
+    withTool(withSource, "golang.org/x/vuln/cmd/govulncheck", version)
+      .withExec(["govulncheck", pkg])
+      .sync
+
+    null
+  }
+
+  """
+  Runs go vet.
+  """
+  vet(pkg: String! = "./..."): Void @check {
+    withSource
+      .withExec(["go", "vet", pkg])
+      .sync
+
+    null
+  }
+
+  """
+  Runs staticcheck.
+  """
+  staticcheck(pkg: String! = "./...", version: String! = "latest"): Void @check {
+    withTool(withSource, "honnef.co/go/tools/cmd/staticcheck", version)
+      .withExec(["staticcheck", pkg])
+      .sync
+
+    null
+  }
+
+  """
+  Tidies go.mod.
+  """
+  tidy: Changeset! @generate {
+    changes(withSource, ["go", "mod", "tidy"])
+  }
+
+  """
+  Runs go generate.
+  """
+  generate(pkg: String! = "./..."): Changeset! @generate {
+    changes(withSource(generate: true), ["go", "generate", pkg], generate: true)
+  }
+}

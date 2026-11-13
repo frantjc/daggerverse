@@ -21,35 +21,24 @@ dagger api call steamcmd \
   ...
 ```
 
-Upload a directory to Steam with `steamcmd`'s `+run_app_build`. The build output directory is backed by a cache volume per app ID, so steamcmd's build cache is reused between builds:
+Upload a directory to Steam with `steamcmd`'s `+run_app_build`. The build output directory is backed by a cache volume per app ID, so steamcmd's build cache is reused between builds. `app-build` takes a list of `depot`s, which the CLI can't pass, so call it from code, e.g. from a Dang module that depends on this one:
 
-```sh
-dagger api call steamcmd \
-  --username "$STEAM_USERNAME" \
-  --password env://STEAM_PASSWORD \
-  app-build \
-  --app-id 480 \
-  --content ./build \
-  --depots '[{"depotId": 481, "recursive": true}]'
+```dang
+steamworks
+  .steamcmd(username: username, password: password, sharedSecret: sharedSecret)
+  .appBuild(
+    appId: 480,
+    content: build,
+    depots: [steamworks.depot(depotId: 481, recursive: true)],
+  )
 ```
 
-By default the uploaded build is not set live on any branch. Pass `--branch` to set it live on a beta branch once uploaded (Steam does not allow this for the `default` branch):
-
-```sh
-dagger api call steamcmd \
-  --username "$STEAM_USERNAME" \
-  --password env://STEAM_PASSWORD \
-  app-build \
-  --app-id 480 \
-  --content ./build \
-  --depots '[{"depotId": 481, "recursive": true}]' \
-  --branch beta
-```
+By default the uploaded build is not set live on any branch. Pass `branch` to set it live on a beta branch once uploaded (Steam does not allow this for the `default` branch).
 
 Wrap an executable with [Steam DRM](https://partner.steamgames.com/doc/features/drm):
 
 ```sh
-dagger api call steamcmd drm-wrap \
+dagger api call steamcmd \
   --username "$STEAM_USERNAME" \
   --password env://STEAM_PASSWORD \
   drm-wrap \

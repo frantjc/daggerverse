@@ -1,0 +1,175 @@
+"""
+Publishes Homebrew casks for GitHub releases.
+"""
+type Homebrew {
+  # The order the cask lists them in, as Go's templates range over map keys.
+  let osOrder = ["linux", "macos", "windows"]
+  let archOrder = ["386", "arm", "intel"]
+
+  """
+  Parses a release asset file name for its goos/goarch, returning them as
+  Homebrew-compatible os/arch strings, e.g. "macos"/"arm", or null if it
+  isn't an archive for one.
+  """
+  let parseOsArch(assetName: String!): {{os: String!, arch: String!}} {
+    # Matches a goos/goarch pair anywhere in a release asset file name with a
+    # .tar.gz or .tgz extension, e.g. "barge-v0.3.3-darwin-amd64.tar.gz". It
+    # doesn't anchor on the name/version prefix so that it's agnostic to
+    # tag/version formatting.
+    let m = assetName.match(`(?:^|[-_])(darwin|linux|windows)[-_](386|amd64|x86_64|arm64|arm)(?:[-_].*)?\.(?:tar\.gz|tgz)$`)
+    if (m == null) {
+      return null
+    }
+    let goos = m.captures[0] ?? ""
+    let goarch = m.captures[1] ?? ""
+    {{
+      os: if (goos == "darwin") "macos" else goos,
+      arch: case (goarch) {
+        "amd64" => "intel"
+        "x86_64" => "intel"
+        "arm64" => "arm"
+        else => goarch
+      }
+    }}
+  }
+
+  let splitRepo(githubRepo: String!): [String!]! {
+    let parts = githubRepo.split("/", limit: 2)
+    if (parts.length != 2) {
+      raise `expected org/repo format, got "${githubRepo}"`
+    }
+    parts
+  }
+
+  """
+  Renders a Homebrew cask for the given GitHub release, with a binary for
+  each os/arch that the release has a .tar.gz or .tgz asset for. Name,
+  homepage and description are looked up from the repo.
+  """
+  caskRb(
+    githubToken: Secret!,
+    """
+    The repo, e.g. "frantjc/barge".
+    """
+    githubRepo: String!,
+    """
+    The release's tag, e.g. "v0.3.3".
+    """
+    tag: String!,
+    container: Container,
+  ): File! {
+    let name = splitRepo(githubRepo)[1] ?? ""
+    let gh = Dagger.gh(githubToken, container: container)
+
+    let view = JSON.decode(
+      gh.container.withExec(["gh", "repo", "view", githubRepo, "--json", "description,homepageUrl"]).stdout,
+    ) :: {{description: String!, homepageUrl: String!}}!
+    let homepage = if (view.homepageUrl == "") `https://github.com/${githubRepo}` else view.homepageUrl
+    let version = tag.trimPrefix("v")
+
+    let binaries = [] :: [{{os: String!, arch: String!, url: String!, sha256: String!}}!]!
+    gh.release(githubRepo, tag).assets.{{name, url, digest}}.each { asset =>
+      let osArch = parseOsArch(asset.name)
+      if (osArch != null) {
+        binaries += [{{os: osArch.os, arch: osArch.arch, url: asset.url, sha256: asset.digest.trimPrefix("sha256:")}}]
+      }
+    }
+
+    let lines = [
+      `cask "${name}" do`,
+      `  desc "${view.description}"`,
+      `  homepage "${homepage}"`,
+      `  version "${version}"`,
+      `  binary "${name}"`,
+      "",
+      "  livecheck do",
+      "    skip \"Auto-generated on release.\"",
+      "  end",
+    ]
+    osOrder.each { os =>
+      let forOs = binaries.filter { b => b.os == os }
+      if (!forOs.isEmpty) {
+        lines += [`  on_${os} do`]
+        archOrder.each { arch =>
+          # As with a map, the last asset for an os/arch wins.
+          let b = forOs.filter { b => b.arch == arch }.takeLast(1)[0]
+          if (b != null) {
+            lines += [
+              `    on_${arch} do`,
+              `      url "${b.url}"`,
+              `      sha256 "${b.sha256}"`,
+              "    end",
+            ]
+          }
+        }
+        lines += ["  end"]
+      }
+    }
+    lines += [
+      "  postflight do",
+      "    if OS.mac?",
+      "      if system_command(\"/usr/bin/xattr\", args: [\"-h\"]).exit_status == 0",
+      `        system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/${name}"]`,
+      "      end",
+      "    end",
+      "  end",
+      "end",
+    ]
+
+    file(`${name}.rb`, lines.join("\n") + "\n")
+  }
+
+  """
+  Renders a Homebrew cask for the given GitHub release and uploads it to the
+  org's homebrew-tap repo, at Casks/<name>.rb, creating or updating the file
+  as needed. Name, homepage and description are looked up from the repo.
+  """
+  @cache(policy: FunctionCachePolicy.NEVER)
+  cask(
+    githubToken: Secret!,
+    """
+    The repo, e.g. "frantjc/barge".
+    """
+    githubRepo: String!,
+    """
+    The release's tag, e.g. "v0.3.3".
+    """
+    tag: String!,
+    container: Container,
+  ): Void {
+    let parts = splitRepo(githubRepo)
+    let org = parts[0] ?? ""
+    let name = parts[1] ?? ""
+    let version = tag.trimPrefix("v")
+    let contents = caskRb(githubToken, githubRepo, tag, container: container).contents
+
+    # The file's current sha must be fresh, or GitHub rejects the update, so
+    # these execs must not be cached.
+    let ctr = Dagger
+      .gh(githubToken, container: container)
+      .container
+      .withEnvVariable("NONCE", UUID.v4)
+
+    let endpoint = `repos/${org}/homebrew-tap/contents/Casks/${name}.rb`
+    let upload = [
+      "gh",
+      "api",
+      "-X=PUT",
+      endpoint,
+      "-f",
+      `message=chore: bump ${name} to ${version}`,
+      "-f",
+      `content=${contents.toBase64}`,
+    ]
+
+    # Absent when the cask doesn't exist yet.
+    let sha = ctr.withExec(["gh", "api", endpoint, "--jq", ".sha"]).stdout.trimSpace rescue ""
+    if (sha != "") {
+      upload += ["-f", `sha=${sha}`]
+    }
+
+    ctr.withExec(upload).sync
+
+    null
+  }
+}

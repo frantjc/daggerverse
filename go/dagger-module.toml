@@ -1,5 +1,13 @@
 name = "go"
-engineVersion = "v1.0.0-beta.23"
+engineVersion = "v1.0.0-beta.26"
 
 [runtime]
-  source = "go"
+  source = "dang"
+
+[[dependencies]]
+  name = "gobuild"
+  source = "dagger.io/go/gobuild@b0476af0f42568416ff2b876807a1748e666626e"
+
+[[dependencies]]
+  name = "gomod"
+  source = "dagger.io/go/gomod@b0476af0f42568416ff2b876807a1748e666626e"

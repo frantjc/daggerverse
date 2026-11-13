@@ -222,23 +222,14 @@ type Mise {
   """
   Formats mise.toml with `mise fmt`. Needs no tools installed.
   """
-  fmt(
-    """
-    Format every mise config file in the source, not just mise.toml.
-    """
-    all: Boolean! = false,
-  ): Changeset! @generate {
-    let args = ["mise", "fmt"]
-    if (all) {
-      args += ["--all"]
-    }
-
+  fmt(): Changeset! @generate {
     wolfi
       .container
       .withFile("/usr/local/bin/mise", binary)
+      .withEnvVariable("MISE_YES", "1")
       .withWorkdir("/src")
       .withDirectory(".", src)
-      .withExec(args)
+      .withExec(["mise", "fmt", "--all"])
       .directory(".")
       .changes(src)
   }
@@ -246,16 +237,14 @@ type Mise {
   """
   Create or refresh lockfile versions, checksums, and download URLs with `mise.lock`.
   """
-  lock(
-  ): Changeset! @generate {
-    let args = ["mise", "lock"]
-
+  lock(): Changeset! @generate {
     wolfi
       .container
       .withFile("/usr/local/bin/mise", binary)
+      .withEnvVariable("MISE_YES", "1")
       .withWorkdir("/src")
       .withDirectory(".", src)
-      .withExec(args)
+      .withExec(["mise", "lock"])
       .directory(".")
       .changes(src)
   }

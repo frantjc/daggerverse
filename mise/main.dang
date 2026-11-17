@@ -28,7 +28,7 @@ type Mise {
   # TODO: replace wolfi + yq with TOML.decode (https://danglang.org/json-yaml)
   # once the engine's Dang has vito/dang@16e19856, which makes Decoded a
   # nameable type: decode into Map[Decoded!]! and cast each value with
-  # `(v! :: String!) rescue ...`. Engine v1.0.0-beta.26/27 pin Dang at
+  # `(v! :: String!) rescue ...`. Engine v1.0.0-beta.27/27 pin Dang at
   # 00dc3801 (v2.3.1-0.20261103042248) and lack it; dagger/dagger main has it
   # since c44662db08 (bump to fcb2429) and b7a30f6f0e (bump to v2.4.1).
   let parseConfig(contents: String!): String! {

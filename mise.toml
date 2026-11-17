@@ -3,8 +3,8 @@ dang = "go:github.com/vito/dang/v2/cmd/dang"
 
 [tools]
 dagger = "0.21.11"
-dang = { version = "2.4.1", "depends" = "go" }
-go = "1.27.3"
+dang = { version = "2.5.0", "depends" = "go" }
+go = "1.27.4"
 
 [env]
-DAGGER_X_RELEASE = "v1.0.0-beta.26"
+DAGGER_X_RELEASE = "v1.0.0-beta.27"
